@@ -23,6 +23,9 @@ class RandomPolicy(Policy):
         return self.action_space.sample()
 
 class DiscretePolicy(Policy):
+    """
+    A discrete, stochastic policy
+    """
     def __init__(self, env):
         super(DiscretePolicy, self).__init__()
         action_space = env.action_space
@@ -60,6 +63,9 @@ class DiscretePolicy(Policy):
 
 
 class TFDiscrete(object):
+    """
+    Tensorflow model for stochastic discrete policies
+    """
     def __init__(self, dU, dO):
         self.dU = dU
         self.dO = dO
