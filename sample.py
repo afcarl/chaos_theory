@@ -1,6 +1,7 @@
 import joblib
 import multiprocessing
 import numpy as np
+import gym
 
 
 class Trajectory(object):
@@ -51,23 +52,43 @@ GLOBAL_POOL = None
 def _pool():
     if GLOBAL_POOL:
         return GLOBAL_POOL
-    return joblib.Parallel(n_jobs=multiprocessing.cpu_count())
+    #return joblib.Parallel(n_jobs=multiprocessing.cpu_count())
+    print 'INIT_PAR'*10
+    global GLOBAL_POOL
+    GLOBAL_POOL = joblib.Parallel(n_jobs=2)
+    return GLOBAL_POOL
 
 def _thread_id():
-    return multiprocessing.current_process()._identity[0]-1
+    n = _pool().n_jobs
+    thid = multiprocessing.current_process()._identity
+    if len(thid) == 0:
+        return -999
+    else:
+        return (thid[0]-1) % n
+
+GLOBAL_ENVS = []
+def init_envs(name):
+    global GLOBAL_ENVS
+    n = _pool().n_jobs
+    GLOBAL_ENVS = [gym.make(name) for _ in range(n)] 
+
+def init_pols(p, env):
+    # Duplicate the policy
+    global GLOBAL_POLS
+    n = _pool().n_jobs
+    #GLOBAL_POLS = [p.copy(env) for _ in range(n)] 
+    from policy import RandomPolicy
+    GLOBAL_POLS = [RandomPolicy(env.action_space) for _ in range(n)]
 
 
-GLOB_ENV = None
 GLOB_POL = None
 def par_rollout(max_length=1):
-    #print 'Sampling Thread:', _thread_id()
+    tid = _thread_id()
     print '.',
-    return rollout(GLOB_ENV, GLOB_POL, render=False, max_length=max_length)
+    return rollout(GLOBAL_ENVS[tid], GLOBAL_POLS[tid], render=False, max_length=max_length)
 
-def sample_par(env, policy, n=1, max_length=1000):
-    global GLOB_ENV, GLOB_POL
-    GLOB_POL = policy
-    GLOB_ENV = env
+def sample_par(env, pol, n=1, max_length=1000):
+    init_pols(pol, env)
     print 'Sampling:'
     with _pool() as parallel:
         res = parallel(joblib.delayed(par_rollout)(max_length=max_length) for i in range(n))

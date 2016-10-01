@@ -85,22 +85,29 @@ class ParamFlatten(object):
         return unflat
 
 def entropy(p):
-    return -np.sum(p*np.log(p+1e-5))
+    return -np.sum(p*np.log(p+1e-10))
 
 def pol_entropy(n, acts):
     histo = np.bincount(acts, minlength=n)
     n_act = float(len(acts))
     histo = histo/n_act
+    assert len(histo) == n
     return entropy(histo)
 
 def print_stats(env, samples):
+    print '--'*10
     N = len(samples)
-    tot_rew = sum([samp.tot_rew for samp in samples])
-    print 'Avg Rew:', tot_rew/N
+    R = np.array([samp.tot_rew for samp in samples])
+    print 'Avg Rew:', np.mean(R), '+/-', np.sqrt(np.var(R))
+
+    T = np.array([samp.T for samp in samples]).astype(np.float)
+    avg_len = np.mean(T)
+    stdev = np.sqrt(np.var(T))
+    print 'Avg Len:', avg_len, '+/-', stdev
     
     all_acts = np.concatenate([samp.act for samp in samples])
     ent = pol_entropy(env.action_space.n, all_acts)
-    print 'Pol Entropy:', ent
+    #print 'Pol Entropy:', ent
     
 
 def discount_rew(rew, gamma=0.99):

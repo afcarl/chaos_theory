@@ -1,6 +1,8 @@
 import numpy as np
 import tensorflow as tf
+import tempfile
 from gym.spaces import Discrete
+
 from utils import *
 
 class Policy(object):
@@ -23,10 +25,10 @@ class RandomPolicy(Policy):
 class DiscretePolicy(Policy):
     def __init__(self, env):
         super(DiscretePolicy, self).__init__()
-        self.action_space = env.action_space
+        action_space = env.action_space
         self.dU = env.action_space.n
         self.dO = env.reset().shape[0]
-        if isinstance(env.action_space, Discrete):
+        if isinstance(action_space, Discrete):
             self.tf_model = TFDiscrete(self.dU, self.dO)
         else:
             raise NotImplementedError()
@@ -51,18 +53,25 @@ class DiscretePolicy(Policy):
     def params(self):
         return self.tf_model.get_params()
 
+    def copy(self, env):
+        pol = DiscretePolicy(env)
+        pol.tf_model = self.tf_model.copy()
+        return pol
+
 
 class TFDiscrete(object):
     def __init__(self, dU, dO):
         self.dU = dU
         self.dO = dO
-        self._build()
-        self._init()
+        self.graph = tf.Graph()
+        with self.graph.as_default():
+            self._build()
+            self._init()
 
     def _build(self):
-        dim_hidden = 5
+        dim_hidden = 10
         self.obs_test = tf.placeholder(tf.float32, (1, self.dO), name='obs_test')
-        
+
         out = self.obs_test
         with tf.variable_scope('policy') as vs:
             W = tf.get_variable('W', [self.dO, dim_hidden])
@@ -86,12 +95,16 @@ class TFDiscrete(object):
         act_test = self.actions[0]
         self.grad_prob = [grad_params(act_test[i], self.params) for i in range(self.dU)]
 
+        self.saver = tf.train.Saver()
+
     def _init(self):
         self.sess = tf.Session()
         self.sess.run(tf.initialize_all_variables())
 
     def _run(self, fetches, feeds={}):
-        return self.sess.run(fetches, feed_dict=feeds)
+        with self.graph.as_default():
+            res = self.sess.run(fetches, feed_dict=feeds)
+        return res
 
     def probs(self, obs):
         obs = np.expand_dims(obs, axis=0)
@@ -112,4 +125,38 @@ class TFDiscrete(object):
         feed = dict(zip(self.param_assign_placeholders, param_list))
         self._run(self.param_assign_ops, feeds=feed)
 
+    def save(self, fname):
+        self.saver.save(self.sess, fname)
+
+    def restore(self, fname):
+        self.saver.restore(self.sess, fname)
+
+    def copy(self):
+        state = self.__getstate__()
+        wts, dU, dO = [state[k] for k in ['wts', 'dU', 'dO']]
+        model = TFDiscrete(dU, dO)
+        with tempfile.NamedTemporaryFile('w+b', delete=True) as f:
+            f.write(wts)
+            f.seek(0)
+            model.restore(f.name)
+        return model
+    
+    def __getstate__(self):
+        with tempfile.NamedTemporaryFile('w+b', delete=True) as f:
+            self.save(f.name)
+            f.seek(0)
+            with open(f.name, 'r') as f2:
+                wts = f2.read()
+        return {'wts': wts,
+                'dU': self.dU,
+                'dO': self.dO
+        }
+
+    def __setstate__(self, state):
+        wts, dU, dO = [state[k] for k in ['wts', 'dU', 'dO']]
+        self.__init__(dU, dO)
+        with tempfile.NamedTemporaryFile('w+b', delete=True) as f:
+            f.write(wts)
+            f.seek(0)
+            self.restore(f.name)
 
