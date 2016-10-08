@@ -21,5 +21,6 @@ def reinforce_grad(pol, trajlist, disc=0.9):
 
             # grad = d logprob/dtheta  * advantage
             grad += advantage_t * (1./act_prob)*grad_prob
+            #grad += advantage_t * grad_prob
     grad = grad/len(trajlist)
     return grad

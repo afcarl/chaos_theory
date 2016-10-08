@@ -4,6 +4,7 @@ from policy_grad import *
 from utils import print_stats
 import gym
 
+#ENV = 'CartPole-v0'
 ENV = 'CartPole-v0'
 
 def main():
