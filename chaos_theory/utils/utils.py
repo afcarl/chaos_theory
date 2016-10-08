@@ -121,4 +121,16 @@ def discount_rew(rew, gamma=0.99):
     for i in range(T):
         new_rew[i] = rew[i]*gamma**i
     return new_rew
+
+
+def discount_value(rew, gamma=0.99):
+    values = np.zeros_like(rew)
+    for t in range(len(rew)):
+        values[t] = np.sum(discount_rew(rew[t:], gamma=gamma))
+    return values
+
+
+
+
+
         
