@@ -1,6 +1,7 @@
 import tempfile
 import os
 import pickle
+import tensorflow as tf
 
 def get_wt_string(saver, sess):
     with tempfile.NamedTemporaryFile('w+b', delete=True) as f:
@@ -32,3 +33,11 @@ def load_pickle_str(string):
         f.seek(0)
         obj = pickle.load(f)
     return obj
+
+def linear(input, dout=None, name=''):
+    _, din = input.get_shape()
+    W = tf.get_variable('W'+name, (din, dout))
+    b = tf.get_variable('b'+name, (dout))
+    return tf.matmul(input, W)+b
+
+

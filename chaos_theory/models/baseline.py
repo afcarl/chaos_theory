@@ -4,6 +4,7 @@ import logging
 from collections import namedtuple
 
 from chaos_theory.utils import discount_value, BatchSampler
+from chaos_theory.utils.tf_utils import linear
 
 LOGGER = logging.getLogger(__name__)
 
@@ -34,9 +35,8 @@ class LinearBaseline(object):
         self.lr = tf.placeholder(tf.float32)
 
         with tf.variable_scope('baseline'):
-            w = tf.get_variable('wobs', [self.dim_obs, 1])
-            b = tf.get_variable('bobs', [1])
-            self.value = tf.matmul(self.obs, w)+b
+            l1 = tf.nn.relu(linear(self.obs, dout=10, name='l1'))
+            self.value = linear(l1, dout=1, name='obs')
 
         self.loss = tf.reduce_mean(tf.square(self.value_labels-self.value))
         optimizer = tf.train.AdamOptimizer(self.lr)
@@ -65,7 +65,7 @@ class LinearBaseline(object):
     def eval(self, obs):
         obs = np.expand_dims(obs, 0)
         val = self.run(self.value, feeds={self.obs: obs})
-        return val[0]
+        return float(val[0])
 
     def train(self, batch_size=5, heartbeat=500, max_iter=5000):
         sampler = BatchSampler(self.train_dataset)

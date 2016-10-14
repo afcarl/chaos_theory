@@ -29,7 +29,7 @@ def main():
             }
 
     prev_grad = np.zeros_like(pol.params)
-    disc = 0.90
+    disc = 0.95
 
     for itr in range(1000):
         samps = sample(env, pol, max_length=200*5)
