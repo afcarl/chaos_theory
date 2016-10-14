@@ -16,13 +16,16 @@ class Trajectory(object):
 
     def __repr__(self):
         return 'Trajectory(len=%d,r=%f)' % (self.T, sum(self.rew))
+    
+    def __len__(self):
+        return self.T
 
     @property
     def tot_rew(self):
         return np.sum(self.rew)
 
 
-def rollout(env, policy, render=True, max_length=1000):
+def rollout(env, policy, render=True, max_length=float('inf')):
     obs = env.reset()
     done = False
     obs_list = [obs]
@@ -95,8 +98,14 @@ def sample_par(env, pol, n=1, max_length=1000):
     print 'done'
     return res
 
-def sample(env, policy, n=1, max_length=1000):
-    return [rollout(env, policy, render=False, max_length=max_length) for _ in range(n)]
+def sample(env, policy, max_length=5000):
+    tot_len = 0
+    samples = []
+    while tot_len < max_length:
+        traj = rollout(env, policy, render=False, max_length=max_length)
+        tot_len += len(traj)
+        samples.append(traj)
+    return samples
 
 
 

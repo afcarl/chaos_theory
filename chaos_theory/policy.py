@@ -3,7 +3,7 @@ import tensorflow as tf
 import tempfile
 from gym.spaces import Discrete
 
-from utils import *
+from utils.utils import *
 
 class Policy(object):
     """docstring for Policy"""
@@ -81,7 +81,7 @@ class TFDiscrete(object):
         out = self.obs_test
         with tf.variable_scope('policy') as vs:
             W = tf.get_variable('W', [self.dO, dim_hidden])
-            b = tf.get_variable('b', [dim_hidden])
+            b = tf.get_variable('b', [dim_hidden])+0.1
             out = tf.nn.relu(tf.matmul(out, W)+b)
 
             W = tf.get_variable('Wfin', [dim_hidden, self.dU])

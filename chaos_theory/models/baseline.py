@@ -3,17 +3,19 @@ import numpy as np
 import logging
 from collections import namedtuple
 
-from chaos_theory.utils import discout_value
+from chaos_theory.utils import discount_value, BatchSampler
 
 LOGGER = logging.getLogger(__name__)
 
 DataPoint = namedtuple('DataPoint', ['obs', 'value'])
 
 class LinearBaseline(object):
-    def __init__(self):
+    def __init__(self, dim_obs):
         self.graph = tf.Graph()
-        with self.graph.as_default_graph():
+        self.dim_obs = dim_obs
+        with self.graph.as_default():
             self._build_model()
+            self._init_tf()
         self.train_dataset = []
 
     def add_to_buffer(self, traj, discount=0.99):
@@ -21,7 +23,7 @@ class LinearBaseline(object):
         act = traj.rew
         values = discount_value(act)
         for t in range(len(values)):
-            train_dataset.append(DataPoint(obs[t], values[t]))
+            self.train_dataset.append(DataPoint(obs[t], values[t]))
 
     def clear_buffer(self):
         self.train_dataset = []
@@ -36,21 +38,22 @@ class LinearBaseline(object):
             b = tf.get_variable('bobs', [1])
             self.value = tf.matmul(self.obs, w)+b
 
-        self.loss = tf.reduce_mean(tf.square(self.value_labels-value))
-        optimizer = tf.train.GradientDescentOptimizer(self.lr)
+        self.loss = tf.reduce_mean(tf.square(self.value_labels-self.value))
+        optimizer = tf.train.AdamOptimizer(self.lr)
         self.train_op = optimizer.minimize(self.loss)
 
-    def _init_model(self):
+    def _init_tf(self):
         self.sess = tf.Session()
         self.run(tf.initialize_all_variables())
 
     def _make_feed(self, batch):
         obs_batch = np.r_[[datum.obs for datum in batch]]
         val_batch = np.r_[[datum.value for datum in batch]]
+        val_batch = np.expand_dims(val_batch, axis=-1)
         return {self.obs: obs_batch, self.value_labels:val_batch}
 
-     def run(self, fetches, feeds=None):
-        with self.graph.as_default_graph():
+    def run(self, fetches, feeds=None):
+        with self.graph.as_default():
             return self.sess.run(fetches, feed_dict=feeds)
 
     def train_step(self, batch, lr=1e-3):
@@ -64,11 +67,16 @@ class LinearBaseline(object):
         val = self.run(self.value, feeds={self.obs: obs})
         return val[0]
 
-    def train(self, batch_size=5, heartbeat=200, max_iter=1000):
+    def train(self, batch_size=5, heartbeat=500, max_iter=5000):
         sampler = BatchSampler(self.train_dataset)
-        with i, batch in enumerate(sampler.with_replacement(batch_size=batch_size)):
+        avg_loss = 0
+        for i, batch in enumerate(sampler.with_replacement(batch_size=batch_size)):
             loss = self.train_step(batch)
-            if i%heartbeat == 0:
-                LOGGER.debug('Itr %d: Loss %f', i, loss)
+            avg_loss += loss
+            if i%heartbeat == 0 and i>0:
+                LOGGER.debug('Itr %d: Loss %f', i, avg_loss/heartbeat)
+                avg_loss=0
+            if i > max_iter:
+                break
 
         

@@ -1,5 +1,5 @@
 import numpy as np
-from utils import discount_rew
+from utils.utils import discount_rew
 
 def reinforce_grad(pol, trajlist, disc=0.9, baseline=None):
     """

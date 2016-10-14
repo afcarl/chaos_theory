@@ -1,8 +1,13 @@
 from policy import *
 from sample import *
 from policy_grad import *
-from utils import print_stats
+from utils.utils import print_stats
+from models.baseline import LinearBaseline
 import gym
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+logging.getLogger().setLevel(logging.DEBUG)
 
 #ENV = 'CartPole-v0'
 ENV = 'CartPole-v0'
@@ -12,8 +17,9 @@ def main():
     init_envs(ENV)
     env = gym.make(ENV)
     pol = DiscretePolicy(env)
-    lr = 1e-3
-    momentum = 0.9
+    baseline = LinearBaseline(4)
+    lr = 1e-2
+    momentum = 0.5
 
     lr_sched = {
             50: 0.5,
@@ -23,9 +29,16 @@ def main():
             }
 
     prev_grad = np.zeros_like(pol.params)
+    disc = 0.90
+
     for itr in range(1000):
-        samps = sample(env, pol, n=10, max_length=300)
-        g = reinforce_grad(pol, samps, disc=0.95)
+        samps = sample(env, pol, max_length=200*5)
+
+        baseline.clear_buffer()
+        [baseline.add_to_buffer(samp, discount=disc) for samp in samps]
+        baseline.train(batch_size=20, heartbeat=500, max_iter=1000)
+        
+        g = reinforce_grad(pol, samps, disc=disc, baseline=baseline)
 
         prev_grad = g + momentum*prev_grad
         new_params = pol.params + lr*prev_grad
@@ -34,7 +47,7 @@ def main():
         print_stats(env, samps)
         if itr%10 == 0:
             print 'itr:', itr
-            rollout(env, pol, max_length=300)
+            #rollout(env, pol, max_length=300)
 
         if itr in lr_sched:
             lr *= lr_sched[itr]

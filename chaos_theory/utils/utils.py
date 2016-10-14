@@ -104,9 +104,10 @@ def print_stats(env, samples):
     avg_len = np.mean(T)
     stdev = np.sqrt(np.var(T))
     print 'Avg Len:', avg_len, '+/-', stdev
+    print 'Num sam:', len(samples)
     
-    all_acts = np.concatenate([samp.act for samp in samples])
-    ent = pol_entropy(env.action_space.n, all_acts)
+    #all_acts = np.concatenate([samp.act for samp in samples])
+    #ent = pol_entropy(env.action_space.n, all_acts)
     #print 'Pol Entropy:', ent
     
 
