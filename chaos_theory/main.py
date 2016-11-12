@@ -3,51 +3,59 @@ from sample import *
 from policy_grad import *
 from utils.utils import print_stats
 from models.baseline import LinearBaseline
+import numpy as np
 import gym
 import logging
 
 logging.basicConfig(level=logging.DEBUG)
 logging.getLogger().setLevel(logging.DEBUG)
+np.random.seed(0)
 
 #ENV = 'CartPole-v0'
-ENV = 'CartPole-v0'
+ENV = 'InvertedPendulum-v1'
+#ENV = 'Reacher-v1'
 
 def main():
     """docstring for main"""
-    init_envs(ENV)
+    #init_envs(ENV)
     env = gym.make(ENV)
-    pol = DiscretePolicy(env)
-    baseline = LinearBaseline(4)
-    lr = 1e-2
-    momentum = 0.5
+    pol = ContinuousPolicy(env)
+    baseline = LinearBaseline(env.observation_space.shape[0])
+    lr = 1e-3
+    momentum = 0.1
+    rew_scale = 1.
 
     lr_sched = {
-            50: 0.5,
-            100: 0.5,
-            200: 0.5,
-            300: 0.5,
+            #10: 0.1,
+            #50: 0.5,
+            #100: 0.5,
+            #200: 0.5,
+            #300: 0.5,
             }
 
     prev_grad = np.zeros_like(pol.params)
-    disc = 0.95
+    disc = 0.90
 
-    for itr in range(1000):
-        samps = sample(env, pol, max_length=200*5)
+    for itr in range(10000):
+        samps = sample(env, pol, max_length=2000, max_samples=10)
+        scale_rew(rew_scale, *samps)
 
-        baseline.clear_buffer()
-        [baseline.add_to_buffer(samp, discount=disc) for samp in samps]
-        baseline.train(batch_size=20, heartbeat=500, max_iter=1000)
+        #baseline.clear_buffer()
+        #[baseline.add_to_buffer(samp, discount=disc) for samp in samps]
+        #baseline.train(batch_size=20, heartbeat=500, max_iter=1500, lr=5e-2)
+        baseline = None
         
         g = reinforce_grad(pol, samps, disc=disc, baseline=baseline)
+        print 'Gradient magnitude:', np.linalg.norm(g)
 
         prev_grad = g + momentum*prev_grad
         new_params = pol.params + lr*prev_grad
         pol.set_params(new_params)
 
-        print_stats(env, samps)
-        if itr%10 == 0:
-            print 'itr:', itr
-            #rollout(env, pol, max_length=300)
+        print_stats(itr, env, samps)
+        if itr%2 == 0:
+            rollout(env, pol, max_length=100)
+            pass
 
         if itr in lr_sched:
             lr *= lr_sched[itr]

@@ -94,8 +94,8 @@ def pol_entropy(n, acts):
     assert len(histo) == n
     return entropy(histo)
 
-def print_stats(env, samples):
-    print '--'*10
+def print_stats(itr, env, samples):
+    print '--'*10, 'itr:', itr
     N = len(samples)
     R = np.array([samp.tot_rew for samp in samples])
     print 'Avg Rew:', np.mean(R), '+/-', np.sqrt(np.var(R))
