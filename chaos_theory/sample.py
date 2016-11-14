@@ -3,6 +3,7 @@ import multiprocessing
 import numpy as np
 import gym
 from chaos_theory.data import Trajectory
+from chaos_theory.utils.progressbar import progress_itr
 
 
 def rollout(env, policy, render=True, max_length=float('inf')):
@@ -83,12 +84,13 @@ def sample_par(env, pol, n=1, max_length=1000):
 def sample(env, policy, max_samples=float('inf'), max_length=float('inf')):
     tot_len = 0
     samples = []
-    while tot_len < max_length:
+    #while tot_len < max_length:
+    for _ in progress_itr(range(max_samples)):
         traj = rollout(env, policy, render=False, max_length=max_length)
         tot_len += len(traj)
         samples.append(traj)
-        if len(samples) >= max_samples:
-            break
+        #if len(samples) >= max_samples:
+        #    break
     return samples
 
 

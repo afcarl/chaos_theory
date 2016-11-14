@@ -1,5 +1,10 @@
 import tensorflow as tf
 from abc import ABCMeta, abstractmethod
+import logging
+
+from chaos_theory.data import BatchSampler
+
+LOGGER = logging.getLogger(__name__)
 
 class TFNet(object):
     __metaclass__ = ABCMeta

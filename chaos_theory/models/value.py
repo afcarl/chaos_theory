@@ -28,7 +28,7 @@ class ValueNetwork(TFNet):
 
     def build_network(self, value_network, dO):
         self.obs = tf.placeholder(tf.float32, [None, dO])
-        self.value_labels = tf.placeholder(tf.float32, [None, 1])
+        self.value_labels = tf.placeholder(tf.float32, [None])
         self.lr = tf.placeholder(tf.float32)
         self.value_pred = value_network(self.obs)
         self.loss = tf.reduce_mean(tf.square(self.value_labels - self.value_pred))
@@ -36,9 +36,9 @@ class ValueNetwork(TFNet):
         self.train_op = optimizer.minimize(self.loss)
 
     def train_step(self, batch, lr):
-        return self.run(self.train_op, {self.lr:lr,
+        return self.run([self.loss, self.train_op], {self.lr:lr,
                                    self.obs: batch.concat.obs,
-                                   self.value_labels: batch.concat.labels})
+                                   self.value_labels: batch.concat.value})[0]
 
 
 class QNetwork(TFNet):
@@ -55,7 +55,7 @@ class QNetwork(TFNet):
     def build_network(self, q_network, dO, dU):
         self.obs = tf.placeholder(tf.float32, [None, dO])
         self.action = tf.placeholder(tf.float32, [None, dU])
-        self.q_labels = tf.placeholder(tf.float32, [None, 1])
+        self.q_labels = tf.placeholder(tf.float32, [None])
         self.lr = tf.placeholder(tf.float32)
         self.q_pred = q_network(self.obs, self.action)
         self.loss = tf.reduce_mean(tf.square(self.q_labels - self.q_pred))
@@ -63,10 +63,10 @@ class QNetwork(TFNet):
         self.train_op = optimizer.minimize(self.loss)
 
     def train_step(self, batch, lr):
-        return self.run(self.train_op, {self.lr: lr,
+        return self.run([self.loss, self.train_op], {self.lr: lr,
                                         self.obs: batch.concat.obs,
                                         self.action: batch.concat.act,
-                                        self.q_labels: batch.concat.value})
+                                        self.q_labels: batch.concat.value})[0]
 
 
 def linear_value_fn(state):

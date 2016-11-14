@@ -24,3 +24,6 @@ class LinearBaseline(ValueNetwork):
     def train(self, **kwargs):
         return self.fit(self.training_data, **kwargs)
         
+    def eval(self, obs):
+        obs = np.expand_dims(obs, axis=0)
+        return self.run(self.value_pred, {self.obs: obs})[0]

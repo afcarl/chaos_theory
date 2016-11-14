@@ -17,7 +17,6 @@ def pol_entropy(pol, samples):
 
 
 def print_stats(itr, pol, env, samples):
-    print '--'*10, 'itr:', itr
     N = len(samples)
     R = np.array([samp.tot_rew for samp in samples])
     print 'Avg Rew:', np.mean(R), '+/-', np.sqrt(np.var(R))

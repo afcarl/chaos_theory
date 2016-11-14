@@ -21,8 +21,8 @@ def main():
     env = gym.make(ENV)
     pol = ContinuousPolicy(env)
     baseline = LinearBaseline(env.observation_space)
-    lr = 5e-2
-    momentum = 0.0
+    lr = 1e-2
+    momentum = 0.9
 
     lr_sched = {
             #10: 0.1,
@@ -36,19 +36,19 @@ def main():
     disc = 0.95
 
     for itr in range(10000):
+        print '--'*10, 'itr:', itr
         samps = sample(env, pol, max_length=2000, max_samples=20)
         [samp.apply_discount(disc) for samp in samps]
 
-        baseline.clear_buffer()
-        [baseline.add_to_buffer(samp) for samp in samps]
-        baseline.train(batch_size=20, heartbeat=500, max_iter=1500, lr=5e-2)
-        #baseline = None
+        #baseline.clear_buffer()
+        #[baseline.add_to_buffer(samp) for samp in samps]
+        #baseline.train(batch_size=20, heartbeat=500, max_iter=1500, lr=5e-2)
+        baseline = None
         
-        g = reinforce_grad(pol, samps, disc=disc, baseline=baseline, batch_norm=False)
+        g = reinforce_grad(pol, samps, disc=disc, baseline=baseline, batch_norm=True)
         g = g/np.linalg.norm(g)
-        print 'Gradient magnitude:', np.linalg.norm(g)
-
         prev_grad = g + momentum*prev_grad
+        print 'Gradient magnitude:', np.linalg.norm(prev_grad)
         new_params = pol.params + lr*prev_grad
         pol.set_params(new_params)
 

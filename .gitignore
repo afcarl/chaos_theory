@@ -85,6 +85,9 @@ ENV/
 # IDEA
 .idea
 
+#MJC
+MUJOCO_LOG.TXT
+
 # Spyder project settings
 .spyderproject
 
