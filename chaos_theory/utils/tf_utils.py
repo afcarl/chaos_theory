@@ -33,7 +33,8 @@ class TFNet(object):
 
     def __init__(self, **build_args):
         self.__graph = tf.Graph()
-        self.build_network(**build_args)
+        with self.__graph.as_default():
+            self.build_network(**build_args)
         self.__init_network()
 
     @abstractmethod

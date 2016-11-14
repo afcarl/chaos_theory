@@ -1,3 +1,5 @@
+from abc import ABCMeta, abstractmethod
+
 import numpy as np
 
 from chaos_theory.utils import discount_value
@@ -32,15 +34,20 @@ class Trajectory(object):
 
 
 class Dataset(object):
+    __metaclass__ = ABCMeta
+
     def __init__(self):
         pass
 
+    @abstractmethod
     def __len__(self):
         raise NotImplementedError()
 
+    @abstractmethod
     def __getitem__(self, item):
         raise NotImplementedError()
 
+    @abstractmethod
     def as_list(self):
         raise NotImplementedError()
 
