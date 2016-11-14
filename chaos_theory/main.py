@@ -21,8 +21,8 @@ def main():
     env = gym.make(ENV)
     pol = ContinuousPolicy(env)
     baseline = LinearBaseline(env.observation_space.shape[0])
-    lr = 1e-3
-    momentum = 0.1
+    lr = 5e-2
+    momentum = 0.0
     rew_scale = 1.
 
     lr_sched = {
@@ -34,27 +34,29 @@ def main():
             }
 
     prev_grad = np.zeros_like(pol.params)
-    disc = 0.90
+    disc = 0.95
 
     for itr in range(10000):
-        samps = sample(env, pol, max_length=2000, max_samples=10)
-        scale_rew(rew_scale, *samps)
+        samps = sample(env, pol, max_length=2000, max_samples=20)
+        #scale_rew(rew_scale, *samps)
 
         #baseline.clear_buffer()
         #[baseline.add_to_buffer(samp, discount=disc) for samp in samps]
         #baseline.train(batch_size=20, heartbeat=500, max_iter=1500, lr=5e-2)
         baseline = None
         
-        g = reinforce_grad(pol, samps, disc=disc, baseline=baseline)
+        g = reinforce_grad(pol, samps, disc=disc, baseline=baseline, batch_norm=True)
+        g = g/np.linalg.norm(g)
         print 'Gradient magnitude:', np.linalg.norm(g)
 
         prev_grad = g + momentum*prev_grad
         new_params = pol.params + lr*prev_grad
         pol.set_params(new_params)
 
-        print_stats(itr, env, samps)
+        print_stats(itr, pol, env, samps)
         if itr%2 == 0:
-            rollout(env, pol, max_length=100)
+            samp = rollout(env, pol, max_length=100)
+            #print samp.act
             pass
 
         if itr in lr_sched:

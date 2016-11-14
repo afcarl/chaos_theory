@@ -79,6 +79,10 @@ class ContinuousPolicy(Policy):
         s1 = self.tf_model.sample_act(obs)
         return s1
 
+    def act_entropy(self, obs):
+        mu, sigma = self.tf_model.probs(obs)
+        return gauss_entropy(sigma)
+
     def grad_act(self, a, obs):
         grad = self.tf_model.grad_probs(a, obs)
         return grad
