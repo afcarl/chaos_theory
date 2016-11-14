@@ -4,6 +4,7 @@ import numpy as np
 def entropy(p):
     return -np.sum(p*np.log(p+1e-10))
 
+
 def pol_entropy(pol, samples):
     total_ent = 0
     tot_n = 0
@@ -13,6 +14,7 @@ def pol_entropy(pol, samples):
             tot_n += 1
             total_ent += pol.act_entropy(traj.obs[t])
     return total_ent / tot_n
+
 
 def print_stats(itr, pol, env, samples):
     print '--'*10, 'itr:', itr

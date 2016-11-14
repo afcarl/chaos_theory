@@ -1,9 +1,21 @@
 """
 Value function networks
 """
+from collections import namedtuple
+
 import tensorflow as tf
 
 from chaos_theory.utils import TFNet, linear
+
+
+ValueDataPoint = namedtuple('DataPoint', ['obs', 'act', 'value'])
+
+
+def create_value_datapoints(traj):
+    dataset = []
+    for t in range(len(traj)):
+        dataset.append(ValueDataPoint(traj.obs[t], traj.act[t], traj.disc_rew[t]))
+    return dataset
 
 
 class ValueNetwork(TFNet):
@@ -24,8 +36,8 @@ class ValueNetwork(TFNet):
 
     def step(self, batch, lr):
         return self.run(self.train_op, {self.lr:lr,
-                                   self.obs: batch.obs,
-                                   self.value_labels: batch.labels})
+                                   self.obs: batch.concat.obs,
+                                   self.value_labels: batch.concat.labels})
 
 
 class QNetwork(TFNet):
@@ -51,9 +63,9 @@ class QNetwork(TFNet):
 
     def step(self, batch, lr):
         return self.run(self.train_op, {self.lr: lr,
-                                        self.obs: batch.obs,
-                                        self.action: batch.action,
-                                        self.q_labels: batch.labels})
+                                        self.obs: batch.concat.obs,
+                                        self.action: batch.concat.act,
+                                        self.q_labels: batch.concat.value})
 
 
 def linear_value_fn(state):

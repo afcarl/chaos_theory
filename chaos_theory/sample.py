@@ -2,32 +2,7 @@ import joblib
 import multiprocessing
 import numpy as np
 import gym
-
-
-class Trajectory(object):
-    """docstring for Trajectory"""
-    def __init__(self, obs, act, rew, info):
-        super(Trajectory, self).__init__()
-        self.obs = np.array(obs).astype(np.float)
-        self.act = np.array(act)
-        self.rew = np.array(rew).astype(np.float)
-        self.info = info
-        self.T = len(self.rew)
-
-    def __repr__(self):
-        return 'Trajectory(len=%d,r=%f)' % (self.T, sum(self.rew))
-    
-    def __len__(self):
-        return self.T
-
-    @property
-    def tot_rew(self):
-        return np.sum(self.rew)
-
-
-def scale_rew(scale, *samples):
-    for sample in samples:
-        sample.rew *= scale 
+from chaos_theory.data import Trajectory
 
 
 def rollout(env, policy, render=True, max_length=float('inf')):

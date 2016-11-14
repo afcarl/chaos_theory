@@ -1,6 +1,9 @@
 import numpy as np
 import random
 
+from chaos_theory.data import ListDataset
+
+
 class BatchSampler(object):
     def __init__(self, data):
         self.data = data
@@ -9,7 +12,7 @@ class BatchSampler(object):
     def with_replacement(self, batch_size=5):
         while True:
             batch_idx = np.random.randint(0, self.num_data, size=batch_size)
-            yield [self.data[idx] for idx in batch_idx]
+            yield ListDataset([self.data[idx] for idx in batch_idx])
 
 
 def split_train_test(dataset, train_perc=0.8, shuffle=True):
