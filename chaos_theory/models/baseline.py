@@ -35,8 +35,9 @@ class LinearBaseline(object):
         self.lr = tf.placeholder(tf.float32)
 
         with tf.variable_scope('baseline'):
-            l1 = tf.nn.relu(linear(self.obs, dout=10, name='l1'))
-            self.value = linear(l1, dout=1, name='obs')
+            #l1 = tf.nn.relu(linear(self.obs, dout=10, name='l1'))
+            #self.value = linear(l1, dout=1, name='obs')
+            self.value = linear(self.obs, dout=1, name='obs')
 
         self.loss = tf.reduce_mean(tf.square(self.value_labels-self.value))
         optimizer = tf.train.AdamOptimizer(self.lr)
@@ -56,7 +57,7 @@ class LinearBaseline(object):
         with self.graph.as_default():
             return self.sess.run(fetches, feed_dict=feeds)
 
-    def train_step(self, batch, lr=1e-3):
+    def train_step(self, batch, lr=1e-2):
         feeds = self._make_feed(batch)
         feeds[self.lr] = lr
         loss, _ = self.run([self.loss, self.train_op], feeds=feeds)
@@ -67,11 +68,11 @@ class LinearBaseline(object):
         val = self.run(self.value, feeds={self.obs: obs})
         return float(val[0])
 
-    def train(self, batch_size=5, heartbeat=500, max_iter=5000):
+    def train(self, batch_size=5, heartbeat=500, max_iter=5000, lr=1e-2):
         sampler = BatchSampler(self.train_dataset)
         avg_loss = 0
         for i, batch in enumerate(sampler.with_replacement(batch_size=batch_size)):
-            loss = self.train_step(batch)
+            loss = self.train_step(batch, lr=lr)
             avg_loss += loss
             if i%heartbeat == 0 and i>0:
                 LOGGER.debug('Itr %d: Loss %f', i, avg_loss/heartbeat)

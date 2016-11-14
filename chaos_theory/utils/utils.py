@@ -4,17 +4,18 @@ import numpy as np
 def entropy(p):
     return -np.sum(p*np.log(p+1e-10))
 
+def pol_entropy(pol, samples):
+    total_ent = 0
+    tot_n = 0
 
-def pol_entropy(n, acts):
-    histo = np.bincount(acts, minlength=n)
-    n_act = float(len(acts))
-    histo = histo/n_act
-    assert len(histo) == n
-    return entropy(histo)
+    for traj in samples:
+        for t in range(len(traj)):
+            tot_n += 1
+            total_ent += pol.act_entropy(traj.obs[t])
+    return total_ent / tot_n
 
-
-def print_stats(env, samples):
-    print '--'*10
+def print_stats(itr, pol, env, samples):
+    print '--'*10, 'itr:', itr
     N = len(samples)
     R = np.array([samp.tot_rew for samp in samples])
     print 'Avg Rew:', np.mean(R), '+/-', np.sqrt(np.var(R))
@@ -26,8 +27,9 @@ def print_stats(env, samples):
     print 'Num sam:', len(samples)
     
     #all_acts = np.concatenate([samp.act for samp in samples])
-    #ent = pol_entropy(env.action_space.n, all_acts)
-    #print 'Pol Entropy:', ent
+    ent = pol_entropy(pol, samples)
+    print 'Pol Entropy:', ent
+    print 'Perplexity:', 2**ent
     
 
 def discount_rew(rew, gamma=0.99):
@@ -49,7 +51,11 @@ def discount_value(rew, gamma=0.99):
         values[t] = np.sum(discount_rew(rew[t:], gamma=gamma))
     return values
 
-
+def gauss_entropy(sigma):
+    dsig = len(sigma)
+    detsig = np.prod(sigma)
+    detsig *= (2*np.pi * np.e)**dsig
+    return 0.5 * np.log(detsig)
 
 
 

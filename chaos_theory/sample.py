@@ -25,6 +25,11 @@ class Trajectory(object):
         return np.sum(self.rew)
 
 
+def scale_rew(scale, *samples):
+    for sample in samples:
+        sample.rew *= scale 
+
+
 def rollout(env, policy, render=True, max_length=float('inf')):
     obs = env.reset()
     done = False
@@ -52,6 +57,7 @@ def rollout(env, policy, render=True, max_length=float('inf')):
 
 
 GLOBAL_POOL = None
+"""
 def _pool():
     if GLOBAL_POOL:
         return GLOBAL_POOL
@@ -60,6 +66,7 @@ def _pool():
     global GLOBAL_POOL
     GLOBAL_POOL = joblib.Parallel(n_jobs=2)
     return GLOBAL_POOL
+"""
 
 def _thread_id():
     n = _pool().n_jobs
@@ -98,13 +105,15 @@ def sample_par(env, pol, n=1, max_length=1000):
     print 'done'
     return res
 
-def sample(env, policy, max_length=5000):
+def sample(env, policy, max_samples=float('inf'), max_length=float('inf')):
     tot_len = 0
     samples = []
     while tot_len < max_length:
         traj = rollout(env, policy, render=False, max_length=max_length)
         tot_len += len(traj)
         samples.append(traj)
+        if len(samples) >= max_samples:
+            break
     return samples
 
 
