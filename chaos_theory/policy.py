@@ -3,8 +3,7 @@ import tensorflow as tf
 import tempfile
 from gym.spaces import Discrete
 
-from utils.utils import *
-from chaos_theory.utils.tf_utils import linear
+from chaos_theory.utils import *
 
 class Policy(object):
     """docstring for Policy"""

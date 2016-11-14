@@ -5,7 +5,8 @@ from collections import namedtuple
 
 import tensorflow as tf
 
-from chaos_theory.utils import TFNet, linear
+from chaos_theory.utils import linear
+from .tf_network import TFNet
 
 
 ValueDataPoint = namedtuple('DataPoint', ['obs', 'act', 'value'])
@@ -34,7 +35,7 @@ class ValueNetwork(TFNet):
         optimizer = tf.train.AdamOptimizer(self.lr)
         self.train_op = optimizer.minimize(self.loss)
 
-    def step(self, batch, lr):
+    def train_step(self, batch, lr):
         return self.run(self.train_op, {self.lr:lr,
                                    self.obs: batch.concat.obs,
                                    self.value_labels: batch.concat.labels})
@@ -61,7 +62,7 @@ class QNetwork(TFNet):
         optimizer = tf.train.AdamOptimizer(self.lr)
         self.train_op = optimizer.minimize(self.loss)
 
-    def step(self, batch, lr):
+    def train_step(self, batch, lr):
         return self.run(self.train_op, {self.lr: lr,
                                         self.obs: batch.concat.obs,
                                         self.action: batch.concat.act,
