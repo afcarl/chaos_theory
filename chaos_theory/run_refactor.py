@@ -10,8 +10,8 @@ logging.getLogger().setLevel(logging.DEBUG)
 np.random.seed(0)
 
 # ENV = 'CartPole-v0'
-#ENV = 'InvertedPendulum-v1'
-ENV = 'Reacher-v1'
+ENV = 'InvertedPendulum-v1'
+#ENV = 'Reacher-v1'
 
 def main():
     """docstring for main"""
@@ -25,10 +25,10 @@ def main():
     for itr in range(10000):
         print '--' * 10, 'itr:', itr
         print pol.network.get_vars()
-        samps = sample(env, pol, max_length=200, max_samples=20)
+        samps = sample(env, pol, max_length=200, max_samples=40)
         [samp.apply_discount(disc) for samp in samps]
 
-        pol.train_step(samps, 1e-3)
+        pol.train_step(samps, 1e-2)
 
         print_stats(itr, pol, env, samps)
         if itr % 2 == 0:

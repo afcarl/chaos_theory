@@ -4,6 +4,7 @@ import numpy as np
 from chaos_theory.data import ListDataset
 from chaos_theory.models.tf_network import TFNet
 from chaos_theory.utils import linear, assert_shape
+from chaos_theory.distribution import DiagGauss
 
 
 class Policy(object):
@@ -38,22 +39,11 @@ class ContinuousPolicy(Policy):
 
 
 def linear_gaussian_policy(min_std=0.1):
-    def inner(obs, act, reuse=False):
-        dU = int(act.get_shape()[1])
+    def inner(obs, dU, reuse=False):
+        dist = DiagGauss(dU, min_var=min_std)
         with tf.variable_scope('policy', reuse=reuse) as vs:
-            mu = linear(obs, dout=dU, name='mu')
-            sigma = tf.exp(linear(obs, dout=dU, name='logsig'))
-            #params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=vs.name)
-            if min_std>0:
-                sigma = tf.maximum(min_std, sigma)
-
-            raise NotImplementedError("Gaussians are screwed up!")
-            dist = tf.contrib.distributions.Normal(mu=mu, sigma=sigma)
-            act_sample = dist.sample(1)[0]
-            act_prob = dist.prob(act)
-            act_prob = tf.reduce_prod(act_prob, reduction_indices=[1])
-            assert_shape(act_prob, [None])
-        return act_sample, act_prob
+            dist.compute_params_tensor(obs)
+        return dist
     return inner
 
 def relu_policy(num_hidden=1, dim_hidden=10, min_std=0.1):
@@ -83,18 +73,24 @@ class ReinforceGrad():
     def surr_loss(self, obs_tensor, act_tensor, returns_tensor, batch_size, pol_network):
         # Compute advantages
         advantage = self.advantage_fn(returns_tensor)
-        avg_advantage = tf.reduce_mean(advantage)
+        #avg_advantage = tf.reduce_mean(advantage)
         #advantage = advantage/avg_advantage
-        advantage = tf.Print(advantage, [advantage], summarize=10, message='Advtg')
+        #advantage = tf.Print(advantage, [advantage], summarize=10, message='Advtg')
         assert_shape(advantage, [None])
 
         # Compute surr loss
-        act_tensor = tf.Print(act_tensor, [act_tensor], summarize=10, message='actions')
-        _, prob_act = pol_network(obs_tensor, act_tensor, reuse=True)
-        prob_act = tf.Print(prob_act, [prob_act], summarize=10, message='like')
-        log_prob_act = tf.log(prob_act)
+        dU = int(act_tensor.get_shape()[-1])
+        sur_pol_dist = pol_network(obs_tensor, dU, reuse=True)
+        #act_tensor = tf.Print(act_tensor, [act_tensor], summarize=10, message='actions')
+        log_prob_act = sur_pol_dist.log_prob_tensor(act_tensor)
         assert_shape(log_prob_act, [None])
-        log_prob_act = tf.Print(log_prob_act, [log_prob_act], summarize=10, message='Logli')
+
+        # debugging
+        #prob_act = tf.exp(log_prob_act)
+        #prob_act = tf.Print(prob_act, [prob_act], summarize=10, message='like')
+        #log_prob_act = tf.log(prob_act)
+
+        #log_prob_act = tf.Print(log_prob_act, [log_prob_act], summarize=10, message='Logli')
 
 
         weighted_logprob = log_prob_act * advantage
@@ -117,16 +113,16 @@ class PolicyNetwork(TFNet):
 
 
     def build_network(self, policy_network, update_rule, dO, dU):
-        self.obs = tf.placeholder(tf.float32, [None, dO])
-        self.act = tf.placeholder(tf.float32, [None, dU])
-        self.act_sample, self.act_prob = policy_network(self.obs, self.act)
+        self.obs = tf.placeholder(tf.float32, [None, dO], name='obs')
+        self.act = tf.placeholder(tf.float32, [None, dU], name='act')
+        self.pol_dist = policy_network(self.obs, dU)
 
         self.lr = tf.placeholder(tf.float32)
 
-        self.obs_surr= tf.placeholder(tf.float32, [None, dO])
-        self.act_surr = tf.placeholder(tf.float32, [None, dU])
-        self.returns_surr = tf.placeholder(tf.float32, [None])
-        self.batch_size = tf.placeholder(tf.float32, ())
+        self.obs_surr= tf.placeholder(tf.float32, [None, dO], name='obs_surr')
+        self.act_surr = tf.placeholder(tf.float32, [None, dU], name='act_surr')
+        self.returns_surr = tf.placeholder(tf.float32, [None], name='ret_surr')
+        self.batch_size = tf.placeholder(tf.float32, (), name='batch_size')
         self.surr_loss = update_rule.surr_loss(self.obs_surr, self.act_surr,
                                                self.returns_surr, self.batch_size,
                                                policy_network)
@@ -137,8 +133,8 @@ class PolicyNetwork(TFNet):
 
     def sample_act(self, obs):
         obs = np.expand_dims(obs, axis=0)
-        act = self.run(self.act_sample, {self.obs: obs})
-        return act[0]
+        pol_params = self.run(self.pol_dist.params, {self.obs: obs})
+        return self.pol_dist.sample(1, *pol_params)[0]
 
     def train_step(self, batch, lr):
         return self.run([self.surr_loss, self.train_op], {self.lr: lr,
