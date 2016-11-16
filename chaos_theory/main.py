@@ -33,7 +33,7 @@ def main():
             }
 
     prev_grad = np.zeros_like(pol.params)
-    disc = 0.95
+    disc = 0.90
 
     for itr in range(10000):
         print '--'*10, 'itr:', itr
@@ -52,7 +52,7 @@ def main():
         new_params = pol.params + lr*prev_grad
         pol.set_params(new_params)
 
-        print_stats(itr, pol, env, samps)
+        print_stats(itr, pol, env, samps, print_entropy=True)
         if itr%2 == 0:
             #samp = rollout(env, pol, max_length=100)
             #print samp.act

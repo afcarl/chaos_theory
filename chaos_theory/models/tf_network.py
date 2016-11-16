@@ -30,6 +30,12 @@ class TFNet(object):
             results = self.__sess.run(fetches, feed_dict=feed_dict)
         return results
 
+    def get_vars(self):
+        with self.__graph.as_default():
+            tvars = tf.trainable_variables()
+        tvals = self.run(tvars)
+        return {tvars[i].name: tvals[i] for i in range(len(tvars))}
+
     def fit(self, dataset, heartbeat=100, max_iter=float('inf'), batch_size=10, lr=1e-3):
         sampler = BatchSampler(dataset)
         avg_loss = 0

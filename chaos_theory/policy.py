@@ -86,6 +86,10 @@ class ContinuousPolicy(Policy):
         grad = self.tf_model.grad_probs(a, obs)
         return grad
 
+    def grad_log_act(self, a, obs):
+        grad = self.tf_model.grad_log_probs(a, obs)
+        return grad
+
     def prob_act(self, a, obs):
         return self.tf_model.prob_act(a, obs)
 
@@ -243,6 +247,7 @@ class TFContinuous(object):
         #act_test = self.actions[0]
         #self.grad_prob = [grad_params(act_test[i], self.params) for i in range(self.dU)]
         self.grad_prob = [tf.gradients(self.act_prob, param)[0] for param in self.params]
+        self.grad_log_prob = [tf.gradients(tf.log(self.act_prob), param)[0] for param in self.params]
 
         self.saver = tf.train.Saver()
 
@@ -254,6 +259,12 @@ class TFContinuous(object):
         with self.graph.as_default():
             res = self.sess.run(fetches, feed_dict=feeds)
         return res
+
+    def grad_log_probs(self, a, obs):
+        obs = np.expand_dims(obs, axis=0)
+        g = self._run(self.grad_prob, {self.obs_test:obs, self.act_test: a})
+        g = self.flattener.pack(g)
+        return g
 
     def probs(self, obs):
         obs = np.expand_dims(obs, axis=0)

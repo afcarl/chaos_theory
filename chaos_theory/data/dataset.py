@@ -2,7 +2,7 @@ from abc import ABCMeta, abstractmethod
 
 import numpy as np
 
-from chaos_theory.utils import discount_value, discount_rew
+from chaos_theory.utils import discount_value
 from chaos_theory.utils.config import FLOAT_X
 
 
@@ -30,7 +30,7 @@ class Trajectory(object):
 
     @property
     def returns(self):
-        return discount_rew(self.rew, gamma=self.discount)
+        return self.disc_rew
 
     @property
     def tot_rew(self):
@@ -76,7 +76,7 @@ class Dataset(object):
 
             def __getattr__(self, name):
                 values = [getattr(data, name) for data in data_list]
-                return np.r_[values].astype(FLOAT_X)
+                return np.concatenate(values).astype(FLOAT_X)
 
         return Dispatch()
 

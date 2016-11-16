@@ -9,7 +9,7 @@ from chaos_theory.utils.progressbar import progress_itr
 def rollout(env, policy, render=True, max_length=float('inf')):
     obs = env.reset()
     done = False
-    obs_list = [obs]
+    obs_list = []
     rew_list = []
     act_list = []
     info_list = []
@@ -19,9 +19,11 @@ def rollout(env, policy, render=True, max_length=float('inf')):
         obs, rew, done, info = env.step(a)
         if render:
             env.render()
+
+        #print obs
         obs_list.append(obs)
-        rew_list.append(rew)
         act_list.append(a)
+        rew_list.append(rew)
         info_list.append(info)
 
         t += 1
