@@ -37,8 +37,8 @@ class ValueNetwork(TFNet):
 
     def train_step(self, batch, lr):
         return self.run([self.loss, self.train_op], {self.lr:lr,
-                                   self.obs: batch.concat.obs,
-                                   self.value_labels: batch.concat.value})[0]
+                                                     self.obs: batch.stack.obs,
+                                                     self.value_labels: batch.stack.value})[0]
 
 
 class QNetwork(TFNet):
@@ -64,9 +64,9 @@ class QNetwork(TFNet):
 
     def train_step(self, batch, lr):
         return self.run([self.loss, self.train_op], {self.lr: lr,
-                                        self.obs: batch.concat.obs,
-                                        self.action: batch.concat.act,
-                                        self.q_labels: batch.concat.value})[0]
+                                                     self.obs: batch.stack.obs,
+                                                     self.action: batch.stack.act,
+                                                     self.q_labels: batch.stack.value})[0]
 
 
 def linear_value_fn(state):

@@ -27,3 +27,8 @@ class LinearBaseline(ValueNetwork):
     def eval(self, obs):
         obs = np.expand_dims(obs, axis=0)
         return self.run(self.value_pred, {self.obs: obs})[0]
+
+
+class GAE(object):
+    def __init__(self, obs_space, _lambda=0.97):
+        pass

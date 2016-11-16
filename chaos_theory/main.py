@@ -2,7 +2,7 @@ from policy import *
 from sample import *
 from policy_grad import *
 from utils.utils import print_stats
-from models.baseline import LinearBaseline
+from models.advantage import LinearBaseline
 import numpy as np
 import gym
 import logging

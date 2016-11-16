@@ -2,7 +2,7 @@ from abc import ABCMeta, abstractmethod
 
 import numpy as np
 
-from chaos_theory.utils import discount_value
+from chaos_theory.utils import discount_value, discount_rew
 from chaos_theory.utils.config import FLOAT_X
 
 
@@ -29,6 +29,10 @@ class Trajectory(object):
         self.disc_rew = discount_value(self.rew, self.discount)
 
     @property
+    def returns(self):
+        return discount_rew(self.rew, gamma=self.discount)
+
+    @property
     def tot_rew(self):
         return np.sum(self.rew)
 
@@ -52,7 +56,7 @@ class Dataset(object):
         raise NotImplementedError()
 
     @property
-    def concat(self):
+    def stack(self):
         data_list = self.as_list()
         class Dispatch(object):
             def __init__(self):
@@ -62,13 +66,27 @@ class Dataset(object):
                 return np.array(values).astype(FLOAT_X)
         return Dispatch()
 
+    @property
+    def concat(self):
+        data_list = self.as_list()
+
+        class Dispatch(object):
+            def __init__(self):
+                pass
+
+            def __getattr__(self, name):
+                values = [getattr(data, name) for data in data_list]
+                return np.r_[values].astype(FLOAT_X)
+
+        return Dispatch()
+
 
 class ListDataset(Dataset):
     """
     >>> from collections import namedtuple
     >>> DataPoint = namedtuple('DataPoint', ['x1', 'x2'])
     >>> dataset = ListDataset([DataPoint([1,1], [0,0]), DataPoint([1,2], [0,1])])
-    >>> dataset.concat.x1
+    >>> dataset.stack.x1
     array([[ 1.,  1.],
            [ 1.,  2.]])
     >>> dataset[0:1]
