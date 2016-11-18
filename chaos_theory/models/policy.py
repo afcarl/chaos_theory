@@ -62,28 +62,31 @@ def relu_policy(num_hidden=1, dim_hidden=10, min_std=0.0, mean_clamp=None):
 
 
 class ReinforceGrad():
-    def __init__(self, advantage=lambda x: x):
+    def __init__(self, normalize_rewards=True, advantage=lambda x: x):
         self.advantage_fn = advantage
+        self.normalize_rewards = normalize_rewards
 
     def surr_loss(self, obs_tensor, act_tensor, returns_tensor, batch_size, pol_network):
         # Compute advantages
         advantage = self.advantage_fn(returns_tensor)
-        #avg_advantage = tf.reduce_mean(advantage)
-        #advantage = advantage/avg_advantage
-        advantage = tf.Print(advantage, [advantage], summarize=10, message='Advtg')
+        if self.normalize_rewards:
+            avg_advantage = tf.reduce_mean(advantage)
+            advantage = advantage/avg_advantage
+
+        #advantage = tf.Print(advantage, [advantage], summarize=10, message='Advtg')
         assert_shape(advantage, [None])
 
         # Compute surr loss
         dU = int(act_tensor.get_shape()[-1])
         sur_pol_dist = pol_network(obs_tensor, dU, reuse=True)
-        act_tensor = tf.Print(act_tensor, [act_tensor], summarize=10, message='actions')
+        #act_tensor = tf.Print(act_tensor, [act_tensor], summarize=10, message='actions')
         log_prob_act = sur_pol_dist.log_prob_tensor(act_tensor)
         assert_shape(log_prob_act, [None])
 
         # debugging
-        prob_act = tf.exp(log_prob_act)
-        prob_act = tf.Print(prob_act, [prob_act], summarize=10, message='like')
-        log_prob_act = tf.log(prob_act)
+        #prob_act = tf.exp(log_prob_act)
+        #prob_act = tf.Print(prob_act, [prob_act], summarize=10, message='like')
+        #log_prob_act = tf.log(prob_act)
 
         #log_prob_act = tf.Print(log_prob_act, [log_prob_act], summarize=10, message='Logli')
 
@@ -134,9 +137,6 @@ class PolicyNetwork(TFNet):
 
     def sample_act(self, obs):
         act = self.__sample_act(obs)
-        while not self.action_space.contains(act):
-            #LOGGER.debug('Action not in action space: %s', act)
-            act = self.__sample_act(obs)
         return act
 
     def train_step(self, batch, lr):

@@ -24,12 +24,13 @@ def reinforce_grad(pol, trajlist, disc=0.9, baseline=None, batch_norm=False):
             if batch_norm:
                 advantage_t = advantage_t / (avg_reward)
 
-            #grad_act = pol.grad_act(act_t, obs_t)
-            grad_log_prob = pol.grad_log_act(act_t, obs_t)
-            #prob_act = pol.prob_act(act_t, obs_t)
+            grad_act = pol.grad_act(act_t, obs_t)
+            #grad_log_prob = pol.grad_log_act(act_t, obs_t)
+            prob_act = pol.prob_act(act_t, obs_t)
             #print 'prob_act:', prob_act
 
             # grad = d logprob/dtheta  * advantage
-            grad += advantage_t * grad_log_prob #(1./prob_act)*grad_act
+            #grad += advantage_t * grad_log_prob #(1./prob_act)*grad_act
+            grad += advantage_t * (1./prob_act)*grad_act
     grad = grad/len(trajlist)
     return grad

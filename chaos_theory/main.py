@@ -33,7 +33,7 @@ def main():
             }
 
     prev_grad = np.zeros_like(pol.params)
-    disc = 0.90
+    disc = 0.95
 
     for itr in range(10000):
         print '--'*10, 'itr:', itr

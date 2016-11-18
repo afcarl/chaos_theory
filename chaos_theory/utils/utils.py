@@ -34,18 +34,38 @@ def print_stats(itr, pol, env, samples, print_entropy=False):
         print 'Perplexity:', 2**ent
 
 
-def discount_value(rew, gamma=0.99):
+#def discount_value(rew, gamma=0.99):
+#    """
+#    >>> r = np.array([0,0,1,0,1]).astype(np.float)
+#    >>> discount_rew(r, gamma=0.5).tolist()
+#    [0.3125, 0.625, 1.25, 0.5, 1.0]
+#    """
+#    T = rew.shape[0]
+#    new_rew = np.zeros_like(rew)
+#    new_rew[T-1] = rew[T-1]
+#    for t in range(T-2, -1, -1):
+#        new_rew[t] = rew[t] + gamma*new_rew[t+1]
+#    return new_rew
+
+
+def discount_rew(rew, gamma=0.99):
     """
-    >>> r = np.array([0,0,1,0,1]).astype(np.float)
+    >>> r = np.ones(5)
     >>> discount_rew(r, gamma=0.5).tolist()
-    [0.3125, 0.625, 1.25, 0.5, 1.0]
+    [1.0, 0.5, 0.25, 0.125, 0.0625]
     """
     T = rew.shape[0]
     new_rew = np.zeros_like(rew)
-    new_rew[T-1] = rew[T-1]
-    for t in range(T-2, -1, -1):
-        new_rew[t] = rew[t] + gamma*new_rew[t+1]
+    for i in range(T):
+        new_rew[i] = rew[i]*gamma**i
     return new_rew
+
+
+def discount_value(rew, gamma=0.99):
+    values = np.zeros_like(rew)
+    for t in range(len(rew)):
+        values[t] = np.sum(discount_rew(rew[t:], gamma=gamma))
+    return values
 
 
 def gauss_entropy(sigma):

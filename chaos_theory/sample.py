@@ -2,20 +2,37 @@ import joblib
 import multiprocessing
 import numpy as np
 import gym
+from gym.spaces import Box
+
 from chaos_theory.data import Trajectory
 from chaos_theory.utils.progressbar import progress_itr
 
 
+def clamp_actions(space, a):
+    if isinstance(space, Box):
+        low, high = space.low, space.high
+        a = np.clip(a, low, high)
+    else:
+        raise NotImplementedError()
+    return a
+
 def rollout(env, policy, render=True, max_length=float('inf')):
     obs = env.reset()
     done = False
-    obs_list = []
+    obs_list = [obs]  #TODO: This is a bug? But for some reason works much better
     rew_list = []
     act_list = []
     info_list = []
     t = 0
+
     while not done:
         a = policy.act(obs)
+
+        # Clamp actions space
+        if not env.action_space.contains(a):
+            a = clamp_actions(env.action_space, a)
+
+
         obs, rew, done, info = env.step(a)
         if render:
             env.render()
@@ -29,6 +46,7 @@ def rollout(env, policy, render=True, max_length=float('inf')):
         t += 1
         if t > max_length:
             break
+    obs_list.pop(-1)
 
     traj = Trajectory(obs_list, act_list, rew_list, info_list)
     return traj
