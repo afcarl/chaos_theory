@@ -8,9 +8,10 @@ class Distribution(object):
         pass
 
 class DiagGauss(object):
-    def __init__(self, dU, min_var=0):
+    def __init__(self, dU, mean_clamp=None, min_var=0):
         self.min_var = min_var
         self.dU = dU
+        self.mean_clamp = mean_clamp
 
     def compute_params_tensor(self, logit):
         mu = linear(logit, dout=self.dU, name='mu')
@@ -18,6 +19,9 @@ class DiagGauss(object):
         #params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=vs.name)
         if self.min_var>0:
             sigma = tf.maximum(self.min_var, sigma)
+
+        if self.mean_clamp:
+            mu = tf.nn.tanh(mu) * self.mean_clamp
 
         dist_params = [mu, sigma]
         self.params = dist_params

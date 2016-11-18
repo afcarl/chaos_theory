@@ -53,8 +53,8 @@ def main():
         pol.set_params(new_params)
 
         print_stats(itr, pol, env, samps, print_entropy=True)
-        if itr%2 == 0:
-            #samp = rollout(env, pol, max_length=100)
+        if itr%5 == 0:
+            samp = rollout(env, pol, max_length=100)
             #print samp.act
             pass
 

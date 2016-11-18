@@ -1,10 +1,13 @@
 import tensorflow as tf
 import numpy as np
+import logging
 
 from chaos_theory.data import ListDataset
 from chaos_theory.models.tf_network import TFNet
 from chaos_theory.utils import linear, assert_shape
 from chaos_theory.distribution import DiagGauss
+
+LOGGER = logging.getLogger(__name__)
 
 
 class Policy(object):
@@ -46,23 +49,15 @@ def linear_gaussian_policy(min_std=0.1):
         return dist
     return inner
 
-def relu_policy(num_hidden=1, dim_hidden=10, min_std=0.1):
-    def inner(obs, act, reuse=False):
-        dU = int(act.get_shape()[1])
+def relu_policy(num_hidden=1, dim_hidden=10, min_std=0.0, mean_clamp=None):
+    def inner(obs, dU, reuse=False):
         out = obs
+        dist = DiagGauss(dU, mean_clamp=mean_clamp, min_var=min_std)
         with tf.variable_scope('policy', reuse=reuse) as vs:
             for i in range(num_hidden):
                 out = tf.nn.relu(linear(out, dout=dim_hidden, name='layer_%d'%i))
-            mu = linear(out, dout=dU, name='mu')
-            sigma = tf.exp(linear(out, dout=dU, name='logsig'))
-            if min_std>0:
-                sigma = tf.maximum(min_std, sigma)
-            #params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=vs.name)
-
-            dist = tf.contrib.distributions.Normal(mu=mu, sigma=sigma)
-            act_sample = dist.sample(1)[0]
-            act_prob = dist.prob(act)
-        return act_sample, act_prob
+            dist.compute_params_tensor(out)
+        return dist
     return inner
 
 
@@ -75,20 +70,20 @@ class ReinforceGrad():
         advantage = self.advantage_fn(returns_tensor)
         #avg_advantage = tf.reduce_mean(advantage)
         #advantage = advantage/avg_advantage
-        #advantage = tf.Print(advantage, [advantage], summarize=10, message='Advtg')
+        advantage = tf.Print(advantage, [advantage], summarize=10, message='Advtg')
         assert_shape(advantage, [None])
 
         # Compute surr loss
         dU = int(act_tensor.get_shape()[-1])
         sur_pol_dist = pol_network(obs_tensor, dU, reuse=True)
-        #act_tensor = tf.Print(act_tensor, [act_tensor], summarize=10, message='actions')
+        act_tensor = tf.Print(act_tensor, [act_tensor], summarize=10, message='actions')
         log_prob_act = sur_pol_dist.log_prob_tensor(act_tensor)
         assert_shape(log_prob_act, [None])
 
         # debugging
-        #prob_act = tf.exp(log_prob_act)
-        #prob_act = tf.Print(prob_act, [prob_act], summarize=10, message='like')
-        #log_prob_act = tf.log(prob_act)
+        prob_act = tf.exp(log_prob_act)
+        prob_act = tf.Print(prob_act, [prob_act], summarize=10, message='like')
+        log_prob_act = tf.log(prob_act)
 
         #log_prob_act = tf.Print(log_prob_act, [log_prob_act], summarize=10, message='Logli')
 
@@ -110,6 +105,7 @@ class PolicyNetwork(TFNet):
                                            dO=self.dO,
                                            dU=self.dU)
         self.obs_space = obs_space
+        self.action_space = action_space
 
 
     def build_network(self, policy_network, update_rule, dO, dU):
@@ -131,10 +127,17 @@ class PolicyNetwork(TFNet):
         self.train_op = optimizer.minimize(self.surr_loss)
         self.gradients = [tf.gradients(self.surr_loss, param)[0] for param in tf.trainable_variables()]
 
-    def sample_act(self, obs):
+    def __sample_act(self, obs):
         obs = np.expand_dims(obs, axis=0)
         pol_params = self.run(self.pol_dist.params, {self.obs: obs})
         return self.pol_dist.sample(1, *pol_params)[0]
+
+    def sample_act(self, obs):
+        act = self.__sample_act(obs)
+        while not self.action_space.contains(act):
+            #LOGGER.debug('Action not in action space: %s', act)
+            act = self.__sample_act(obs)
+        return act
 
     def train_step(self, batch, lr):
         return self.run([self.surr_loss, self.train_op], {self.lr: lr,
