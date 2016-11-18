@@ -1,3 +1,5 @@
+from chaos_theory.algorithm.reinforce import ReinforceGrad
+from chaos_theory.models.advantage import LinearBaseline
 from chaos_theory.models.policy import PolicyNetwork, ContinuousPolicy, relu_policy
 from chaos_theory.sample import sample, rollout
 from utils.utils import print_stats
@@ -9,24 +11,28 @@ logging.basicConfig(level=logging.DEBUG)
 logging.getLogger().setLevel(logging.DEBUG)
 np.random.seed(0)
 
-# ENV = 'CartPole-v0'
+#ENV = 'CartPole-v0'
 ENV = 'InvertedPendulum-v1'
-#ENV = 'Reacher-v1'
+#ENV = 'HalfCheetah-v1'
+#ENV = 'Hopper-v1'
 
 def main():
     """docstring for main"""
     # init_envs(ENV)
     env = gym.make(ENV)
     policy_arch = relu_policy()
+    baseline = LinearBaseline(env.observation_space)
     network = PolicyNetwork(env.action_space, env.observation_space,
-            policy_network=policy_arch)
+            policy_network=policy_arch,
+            #algorithm=ReinforceGrad(advantage=baseline))
+            algorithm=ReinforceGrad())
     pol = ContinuousPolicy(network)
 
-    disc = 0.9
+    disc = 0.90
     for itr in range(10000):
         print '--' * 10, 'itr:', itr
         #print pol.network.get_vars()
-        samps = sample(env, pol, max_length=200, max_samples=20)
+        samps = sample(env, pol, max_length=500, max_samples=20)
         [samp.apply_discount(disc) for samp in samps]
 
         pol.train_step(samps, 5e-3)

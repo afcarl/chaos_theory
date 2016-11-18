@@ -10,13 +10,12 @@ def pol_entropy(pol, samples):
     tot_n = 0
 
     for traj in samples:
-        for t in range(len(traj)):
-            tot_n += 1
-            total_ent += pol.act_entropy(traj.obs[t])
+        tot_n += traj.T
+        total_ent += np.sum(pol.act_entropy(traj.obs))
     return total_ent / tot_n
 
 
-def print_stats(itr, pol, env, samples, print_entropy=False):
+def print_stats(itr, pol, env, samples):
     N = len(samples)
     R = np.array([samp.tot_rew for samp in samples])
     print 'Avg Rew:', np.mean(R), '+/-', np.sqrt(np.var(R))
@@ -28,10 +27,9 @@ def print_stats(itr, pol, env, samples, print_entropy=False):
     print 'Num sam:', len(samples)
     
     #all_acts = np.concatenate([samp.act for samp in samples])
-    if print_entropy:
-        ent = pol_entropy(pol, samples)
-        print 'Pol Entropy:', ent
-        print 'Perplexity:', 2**ent
+    ent = pol_entropy(pol, samples)
+    print 'Avg Entropy:', ent
+    print 'Avg Perplexity:', 2**ent
 
 
 #def discount_value(rew, gamma=0.99):

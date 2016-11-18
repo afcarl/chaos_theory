@@ -44,7 +44,7 @@ def rollout(env, policy, render=True, max_length=float('inf')):
         info_list.append(info)
 
         t += 1
-        if t > max_length:
+        if t >= max_length:
             break
     obs_list.pop(-1)
 

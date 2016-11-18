@@ -42,6 +42,6 @@ class DiagGauss(object):
         return samps
 
     def entropy(self, mu, sigma):
-        log_sigma = tf.log(sigma)
-        return np.sum(np.sqrt(log_sigma) + np.log(np.sqrt(2 * np.pi * np.e)), axis=-1)
+        ent = np.sum(np.log(2*np.pi*np.e*sigma), axis=-1)
+        return 0.5*ent
 

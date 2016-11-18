@@ -2,6 +2,7 @@ import tensorflow as tf
 import numpy as np
 import logging
 
+from chaos_theory.algorithm.reinforce import ReinforceGrad
 from chaos_theory.data import ListDataset
 from chaos_theory.models.tf_network import TFNet
 from chaos_theory.utils import linear, assert_shape
@@ -37,6 +38,9 @@ class ContinuousPolicy(Policy):
     def act(self, obs):
         return self.network.sample_act(obs)
 
+    def act_entropy(self, obs):
+        return self.network.action_entropy(obs)
+
     def train_step(self, trajlist, lr):
         return self.network.train_step(ListDataset(trajlist), lr)
 
@@ -48,6 +52,7 @@ def linear_gaussian_policy(min_std=0.1):
             dist.compute_params_tensor(obs)
         return dist
     return inner
+
 
 def relu_policy(num_hidden=1, dim_hidden=10, min_std=0.0, mean_clamp=None):
     def inner(obs, dU, reuse=False):
@@ -61,50 +66,18 @@ def relu_policy(num_hidden=1, dim_hidden=10, min_std=0.0, mean_clamp=None):
     return inner
 
 
-class ReinforceGrad():
-    def __init__(self, normalize_rewards=True, advantage=lambda x: x):
-        self.advantage_fn = advantage
-        self.normalize_rewards = normalize_rewards
-
-    def surr_loss(self, obs_tensor, act_tensor, returns_tensor, batch_size, pol_network):
-        # Compute advantages
-        advantage = self.advantage_fn(returns_tensor)
-        if self.normalize_rewards:
-            avg_advantage = tf.reduce_mean(advantage)
-            advantage = advantage/avg_advantage
-
-        #advantage = tf.Print(advantage, [advantage], summarize=10, message='Advtg')
-        assert_shape(advantage, [None])
-
-        # Compute surr loss
-        dU = int(act_tensor.get_shape()[-1])
-        sur_pol_dist = pol_network(obs_tensor, dU, reuse=True)
-        #act_tensor = tf.Print(act_tensor, [act_tensor], summarize=10, message='actions')
-        log_prob_act = sur_pol_dist.log_prob_tensor(act_tensor)
-        assert_shape(log_prob_act, [None])
-
-        # debugging
-        #prob_act = tf.exp(log_prob_act)
-        #prob_act = tf.Print(prob_act, [prob_act], summarize=10, message='like')
-        #log_prob_act = tf.log(prob_act)
-
-        #log_prob_act = tf.Print(log_prob_act, [log_prob_act], summarize=10, message='Logli')
-
-
-        weighted_logprob = log_prob_act * advantage
-        #weighted_logprob = tf.Print(weighted_logprob, [weighted_logprob], summarize=10, message='WeightLogli')
-        surr_loss = - tf.reduce_sum(weighted_logprob)/batch_size
-        return surr_loss
-
-
 class PolicyNetwork(TFNet):
     def __init__(self, action_space, obs_space, 
                 policy_network=linear_gaussian_policy(0.01),
-                 update_rule=ReinforceGrad()):
+                 algorithm=None):
+        if algorithm is None:
+            algorithm = ReinforceGrad()
+        self.algorithm = algorithm
+        algorithm.set_policy(self)
         self.dO = obs_space.shape[0]
         self.dU = action_space.shape[0]
         super(PolicyNetwork, self).__init__(policy_network=policy_network,
-                                            update_rule=update_rule,
+                                            update_rule=algorithm,
                                            dO=self.dO,
                                            dU=self.dU)
         self.obs_space = obs_space
@@ -139,11 +112,13 @@ class PolicyNetwork(TFNet):
         act = self.__sample_act(obs)
         return act
 
+    def action_entropy(self, obs):
+        if len(obs.shape) < 2:
+            obs = np.expand_dims(obs, 0)
+        pol_params = self.run(self.pol_dist.params, {self.obs:obs})
+        return self.pol_dist.entropy(*pol_params)
+
     def train_step(self, batch, lr):
-        return self.run([self.surr_loss, self.train_op], {self.lr: lr,
-                                                     self.obs_surr: batch.concat.obs,
-                                                     self.act_surr: batch.concat.act,
-                                                     self.batch_size: len(batch),
-                                                     self.returns_surr: batch.concat.returns})[0]
+        self.algorithm.update(batch, lr)
 
 

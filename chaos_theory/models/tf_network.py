@@ -10,7 +10,8 @@ class TFNet(object):
     __metaclass__ = ABCMeta
 
     def __init__(self, **build_args):
-        self.__graph = tf.Graph()
+        #self.__graph = tf.Graph()
+        self.__graph = tf.get_default_graph()
         with self.__graph.as_default():
             self.build_network(**build_args)
         self.__init_network()

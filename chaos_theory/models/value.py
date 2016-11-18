@@ -24,13 +24,15 @@ class ValueNetwork(TFNet):
         self.dO = obs_space.shape[0]
         super(ValueNetwork, self).__init__(value_network=value_network,
                                            dO=self.dO)
+        self.build_value_network = value_network
         self.obs_space = obs_space
 
     def build_network(self, value_network, dO):
         self.obs = tf.placeholder(tf.float32, [None, dO])
         self.value_labels = tf.placeholder(tf.float32, [None])
         self.lr = tf.placeholder(tf.float32)
-        self.value_pred = value_network(self.obs)
+        with tf.variable_scope('value_network'):
+            self.value_pred = value_network(self.obs)
         self.loss = tf.reduce_mean(tf.square(self.value_labels - self.value_pred))
         optimizer = tf.train.AdamOptimizer(self.lr)
         self.train_op = optimizer.minimize(self.loss)
