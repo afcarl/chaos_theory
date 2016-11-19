@@ -6,51 +6,55 @@ from chaos_theory.utils import assert_shape
 
 
 class ReinforceGrad():
-    def __init__(self, normalize_rewards=True, advantage=Advantage()):
+    def __init__(self, normalize_rewards=True, advantage=Advantage(), pol_network=None):
         self.advantage = advantage
         self.normalize_rewards = normalize_rewards
-
-    def set_policy(self, tf_net):
-        self.policy_net = tf_net
+        self.policy_net = pol_network
+        self.dO = pol_network.dO
+        self.dU = pol_network.dU
+        self.__compute_surr()
 
     def surr_loss(self, obs_tensor, act_tensor, returns_tensor, batch_size, pol_network):
-        self.obs_surr = obs_tensor
-        self.act_surr = act_tensor
-        self.returns_surr = returns_tensor
-        self.batch_size = batch_size
-
         # Compute advantages
         advantage = self.advantage.apply(returns_tensor, act_tensor, obs_tensor)
         if self.normalize_rewards:
             avg_advantage = tf.reduce_mean(advantage)
             advantage = advantage/avg_advantage
-
-        #advantage = tf.Print(advantage, [advantage], summarize=10, message='Advtg')
         assert_shape(advantage, [None])
 
         # Compute surr loss
         dU = int(act_tensor.get_shape()[-1])
         sur_pol_dist = pol_network(obs_tensor, dU, reuse=True)
-        #act_tensor = tf.Print(act_tensor, [act_tensor], summarize=10, message='actions')
         log_prob_act = sur_pol_dist.log_prob_tensor(act_tensor)
         assert_shape(log_prob_act, [None])
 
-        # debugging
-        #prob_act = tf.exp(log_prob_act)
-        #prob_act = tf.Print(prob_act, [prob_act], summarize=10, message='like')
-        #log_prob_act = tf.log(prob_act)
-        #log_prob_act = tf.Print(log_prob_act, [log_prob_act], summarize=10, message='Logli')
-
         weighted_logprob = log_prob_act * advantage
-        #weighted_logprob = tf.Print(weighted_logprob, [weighted_logprob], summarize=10, message='WeightLogli')
-        self.surr_loss = - tf.reduce_sum(weighted_logprob)/batch_size
-        return self.surr_loss
+        surr_loss = - tf.reduce_sum(weighted_logprob)/batch_size
+        return surr_loss
+
+    def __compute_surr(self):
+        self.lr = tf.placeholder(tf.float32)
+        self.obs_surr= tf.placeholder(tf.float32, [None, self.dO], name='obs_surr')
+        self.act_surr = tf.placeholder(tf.float32, [None, self.dU], name='act_surr')
+        self.returns_surr = tf.placeholder(tf.float32, [None], name='ret_surr')
+        self.batch_size = tf.placeholder(tf.float32, (), name='batch_size')
+
+        self.surr_loss = self.surr_loss(self.obs_surr, self.act_surr,
+                                   self.returns_surr, self.batch_size,
+                                   self.policy_net.policy_network)
+        optimizer = tf.train.AdamOptimizer(self.lr)
+        self.train_op = optimizer.minimize(self.surr_loss)
+
+        self.sess = self.policy_net.sess
+        self.sess.run(tf.initialize_all_variables())
 
     def update(self, samples, lr):
         self.advantage.update(samples)
         batch = ListDataset(samples)
-        return self.policy_net.run([self.surr_loss, self.policy_net.train_op], {self.policy_net.lr: lr,
+        return self.sess.run([self.surr_loss, self.train_op], {
+                                                          self.lr: lr,
                                                           self.obs_surr: batch.concat.obs,
                                                           self.act_surr: batch.concat.act,
                                                           self.batch_size: len(batch),
                                                           self.returns_surr: batch.concat.returns})[0]
+

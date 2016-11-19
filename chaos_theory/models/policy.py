@@ -69,39 +69,20 @@ def relu_policy(num_hidden=1, dim_hidden=10, min_std=0.0, mean_clamp=None):
 class PolicyNetwork(TFNet):
     def __init__(self, action_space, obs_space, 
                 policy_network=linear_gaussian_policy(0.01),
-                 algorithm=None):
-        if algorithm is None:
-            algorithm = ReinforceGrad()
-        self.algorithm = algorithm
-        algorithm.set_policy(self)
+                ):
         self.dO = obs_space.shape[0]
         self.dU = action_space.shape[0]
         super(PolicyNetwork, self).__init__(policy_network=policy_network,
-                                            update_rule=algorithm,
                                            dO=self.dO,
                                            dU=self.dU)
         self.obs_space = obs_space
         self.action_space = action_space
+        self.policy_network = policy_network
 
-
-    def build_network(self, policy_network, update_rule, dO, dU):
+    def build_network(self, policy_network, dO, dU):
         self.obs = tf.placeholder(tf.float32, [None, dO], name='obs')
         self.act = tf.placeholder(tf.float32, [None, dU], name='act')
         self.pol_dist = policy_network(self.obs, dU)
-
-        self.lr = tf.placeholder(tf.float32)
-
-        self.obs_surr= tf.placeholder(tf.float32, [None, dO], name='obs_surr')
-        self.act_surr = tf.placeholder(tf.float32, [None, dU], name='act_surr')
-        self.returns_surr = tf.placeholder(tf.float32, [None], name='ret_surr')
-        self.batch_size = tf.placeholder(tf.float32, (), name='batch_size')
-        self.surr_loss = update_rule.surr_loss(self.obs_surr, self.act_surr,
-                                               self.returns_surr, self.batch_size,
-                                               policy_network)
-
-        optimizer = tf.train.AdamOptimizer(self.lr)
-        self.train_op = optimizer.minimize(self.surr_loss)
-        self.gradients = [tf.gradients(self.surr_loss, param)[0] for param in tf.trainable_variables()]
 
     def __sample_act(self, obs):
         obs = np.expand_dims(obs, axis=0)
@@ -119,6 +100,4 @@ class PolicyNetwork(TFNet):
         return self.pol_dist.entropy(*pol_params)
 
     def train_step(self, batch, lr):
-        self.algorithm.update(batch, lr)
-
-
+        raise NotImplementedError()

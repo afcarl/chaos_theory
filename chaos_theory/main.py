@@ -21,21 +21,19 @@ def main():
     # init_envs(ENV)
     env = gym.make(ENV)
     policy_arch = relu_policy()
-    baseline = LinearBaseline(env.observation_space)
+    #baseline = LinearBaseline(env.observation_space)
     network = PolicyNetwork(env.action_space, env.observation_space,
-            policy_network=policy_arch,
-            #algorithm=ReinforceGrad(advantage=baseline))
-            algorithm=ReinforceGrad())
+            policy_network=policy_arch)
+    algorithm = ReinforceGrad(pol_network=network)
     pol = ContinuousPolicy(network)
 
     disc = 0.90
     for itr in range(10000):
         print '--' * 10, 'itr:', itr
-        #print pol.network.get_vars()
         samps = sample(env, pol, max_length=500, max_samples=20)
         [samp.apply_discount(disc) for samp in samps]
 
-        pol.train_step(samps, 5e-3)
+        algorithm.update(samps, 5e-3)
 
         print_stats(itr, pol, env, samps)
         if itr % 5 == 0:
