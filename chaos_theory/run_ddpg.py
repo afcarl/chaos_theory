@@ -26,21 +26,16 @@ def main():
     policy_arch = linear_deterministic_policy()
     q_network = linear_q_fn
     algorithm = DDPG(env.observation_space, env.action_space,
-                     q_network, policy_arch)
+                     q_network, policy_arch, discount=0.95, noise=5e-2)
     pol = NNPolicy(algorithm.actor)
 
-    disc = 0.90
     for itr in range(10000):
         print '--' * 10, 'itr:', itr
-        samps = sample(env, pol, max_length=MAX_LENGTH, max_samples=20)
-        [samp.apply_discount(disc) for samp in samps]
-
-        algorithm.update(samps, lr=5e-3)
-
+        samps = sample(env, pol, max_length=MAX_LENGTH, max_samples=10)
+        algorithm.update(samps)
         print_stats(itr, pol, env, samps)
         if itr % 5 == 0:
             samp = rollout(env, pol, max_length=MAX_LENGTH)
-            # print samp.act
             pass
 
 if __name__ == "__main__":

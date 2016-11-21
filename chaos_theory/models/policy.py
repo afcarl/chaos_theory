@@ -130,6 +130,7 @@ class StochasticPolicyNetwork(TFNet):
 class DeterministicPolicyNetwork(TFNet):
     def __init__(self, action_space, obs_space,
                  policy_network=linear_deterministic_policy(),
+                 noise=1e-3
                  ):
         self.dO = obs_space.shape[0]
         self.dU = action_space_dim(action_space)
@@ -139,16 +140,17 @@ class DeterministicPolicyNetwork(TFNet):
         self.obs_space = obs_space
         self.action_space = action_space
         self.policy_network = policy_network
+        self.noise = noise
 
     def build_network(self, policy_network, dO, dU):
         self.obs = tf.placeholder(tf.float32, [None, dO], name='obs')
         self.pol_out = policy_network(self.obs, dU)
 
-    def sample_act(self, obs, noise_var=1.):
+    def sample_act(self, obs):
         obs = np.expand_dims(obs, axis=0)
         act = self.run(self.pol_out, {self.obs: obs})[0]
-        if noise_var > 0:
-            noise = np.random.randn(*act.shape)*noise_var
+        if self.noise > 0:
+            noise = np.random.randn(*act.shape)*self.noise
         else:
             noise = 0
         return act + noise

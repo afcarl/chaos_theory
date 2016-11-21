@@ -1,12 +1,12 @@
 import tensorflow as tf
 
-from chaos_theory.algorithm.algorithm import Algorithm
+from chaos_theory.algorithm.algorithm import BatchAlgorithm
 from chaos_theory.data import ListDataset
 from chaos_theory.models.advantage import Advantage
 from chaos_theory.utils import assert_shape
 
 
-class ReinforceGrad(Algorithm):
+class ReinforceGrad(BatchAlgorithm):
     def __init__(self, normalize_rewards=True, advantage=Advantage(), pol_network=None):
         super(ReinforceGrad, self).__init__()
         self.advantage = advantage

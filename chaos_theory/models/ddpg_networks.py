@@ -89,15 +89,15 @@ class TargetQNetwork(TFContext):
             self.trainable_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=vs.name)
 
             self.track_ops = [tf.assign(self.trainable_vars[i],
-                      self.track_rate*self.trainable_vars[i] + (1-self.track_rate)*self.critic_network.trainable_vars[i])
+                                        (1-self.track_rate)*self.trainable_vars[i] + (self.track_rate)*self.critic_network.trainable_vars[i])
                               for i in range(len(self.trainable_vars))]
 
             self.copy_op = [tf.assign(self.trainable_vars[i], self.critic_network.trainable_vars[i])
                               for i in range(len(self.trainable_vars))]
 
-    def compute_returns(self, batch):
+    def compute_returns(self, batch, discount=1.0):
         returns = self.run(self.q_pred, {self.obs: batch.stack.obs})
-        returns = returns[:,0] + batch.stack.rew
+        returns = discount*returns[:,0] + batch.stack.rew
 
         data = []
         for i in range(len(batch)):

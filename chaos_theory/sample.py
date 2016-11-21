@@ -56,6 +56,33 @@ def rollout(env, policy, render=True, max_length=float('inf')):
     return traj
 
 
+def online_rollout(env, policy, alg, render=False, max_length=float('inf')):
+    obs = env.reset()
+    done = False
+    t = 0
+
+    while not done:
+        a_raw = a = policy.act(obs)
+
+        if isinstance(env.action_space, Discrete):
+            a = np.argmax(a)
+        else:
+            # Clamp actions space
+            if not env.action_space.contains(a):
+                a = clamp_actions(env.action_space, a)
+
+        new_obs, rew, done, info = env.step(a)
+        if render:
+            env.render()
+
+        alg.update(obs, a, rew, new_obs)
+        obs = new_obs
+        t += 1
+        if t >= max_length:
+            break
+
+
+
 GLOBAL_POOL = None
 """
 def _pool():
