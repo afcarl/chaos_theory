@@ -1,13 +1,10 @@
 import numpy as np
 import tensorflow as tf
 
+from chaos_theory.distribution.distribution import Distribution
 from chaos_theory.utils import linear, assert_shape
 
-class Distribution(object):
-    def sample(self, N, *dist_params):
-        pass
-
-class DiagGauss(object):
+class DiagGauss(Distribution):
     def __init__(self, dU, mean_clamp=None, min_var=0):
         self.min_var = min_var
         self.dU = dU
@@ -36,12 +33,14 @@ class DiagGauss(object):
                - 0.5 * tf.reduce_sum(zs, reduction_indices=[-1]) \
                - 0.5 * self.dU * np.log(2 * np.pi)
 
-    def sample(self, N, mu, sigma):
+    def sample(self, N, params):
+        mu, sigma = params
         samps = np.random.randn(N, self.dU)
         samps = samps*np.sqrt(sigma) + mu
         return samps
 
-    def entropy(self, mu, sigma):
+    def entropy(self, params):
+        mu, sigma = params
         ent = np.sum(np.log(2*np.pi*np.e*sigma), axis=-1)
         return 0.5*ent
 

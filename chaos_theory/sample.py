@@ -3,6 +3,7 @@ import multiprocessing
 import numpy as np
 import gym
 from gym.spaces import Box
+from gym.spaces import Discrete
 
 from chaos_theory.data import Trajectory
 from chaos_theory.utils.progressbar import progress_itr
@@ -26,12 +27,15 @@ def rollout(env, policy, render=True, max_length=float('inf')):
     t = 0
 
     while not done:
-        a = policy.act(obs)
+        a_raw = a = policy.act(obs)
 
-        # Clamp actions space
-        if not env.action_space.contains(a):
-            a = clamp_actions(env.action_space, a)
 
+        if isinstance(env.action_space, Discrete):
+            a = np.argmax(a)
+        else:
+            # Clamp actions space
+            if not env.action_space.contains(a):
+                a = clamp_actions(env.action_space, a)
 
         obs, rew, done, info = env.step(a)
         if render:
@@ -39,7 +43,7 @@ def rollout(env, policy, render=True, max_length=float('inf')):
 
         #print obs
         obs_list.append(obs)
-        act_list.append(a)
+        act_list.append(a_raw)
         rew_list.append(rew)
         info_list.append(info)
 
