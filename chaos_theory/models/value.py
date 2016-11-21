@@ -73,3 +73,9 @@ class QNetwork(TFNet):
 def linear_value_fn(state):
     value = linear(state, dout=1)
     return value
+
+def linear_q_fn(state, action, reuse=False):
+    with tf.variable_scope('q_function', reuse=reuse):
+        a1 = linear(state, dout=1, name='state')
+        a2 = linear(action, dout=1, name='act')
+    return a1+a2

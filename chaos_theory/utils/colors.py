@@ -3,6 +3,9 @@ Most of this code is taken from
 the colorama library
 """
 import sys
+import logging
+
+from chaos_theory.utils.config import COLOR_CODES
 
 CSI = '\033['
 OSC = '\033]'
@@ -148,3 +151,39 @@ def cursorl():
 
 def cursorr():
     print Cursor.FORWARD()
+
+
+def color_string(msg, color=None):
+    return _COLOR_MAP[color][0] + msg + Fore.RESET
+
+
+def get_default_color(name):
+    for code_dir in COLOR_CODES:
+        if code_dir in name:
+            return COLOR_CODES[code_dir]
+    return COLOR_CODES['default']
+
+
+class ColorLogger(object):
+    def __init__(self, name, color=None):
+        self.name = name
+        self.logger = logging.getLogger(name)
+        if color is None:
+            color = get_default_color(name)
+        self.color = color
+
+    def info(self, msg, *frmat):
+        msg = color_string(msg % frmat, color=self.color)
+        self.logger.info(msg)
+
+    def debug(self, msg, *frmat):
+        msg = color_string(msg % frmat, color=self.color)
+        self.logger.debug(msg)
+
+    def warning(self, msg, *frmat):
+        msg = color_string(msg % frmat, color='red')
+        self.logger.warning(msg)
+
+    def error(self, msg, *frmat):
+        msg = color_string(msg % frmat, color='red')
+        self.logger.error(msg)

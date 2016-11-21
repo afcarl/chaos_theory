@@ -32,7 +32,9 @@ def linear_softmax_policy():
 
 def linear_deterministic_policy():
     def inner(obs, dU, reuse=False):
-        return linear(obs, dout=dU)
+        with tf.variable_scope('policy', reuse=reuse):
+            pol = linear(obs, dout=dU)
+        return pol
     return inner
 
 
@@ -76,9 +78,9 @@ class GreedyPolicy(Policy):
         raise NotImplementedError()
 
 
-class ContinuousPolicy(Policy):
+class NNPolicy(Policy):
     def __init__(self, network):
-        super(ContinuousPolicy, self).__init__()
+        super(NNPolicy, self).__init__()
         self.network = network
 
     def act(self, obs):
@@ -86,9 +88,6 @@ class ContinuousPolicy(Policy):
 
     def act_entropy(self, obs):
         return self.network.action_entropy(obs)
-
-    def train_step(self, trajlist, lr):
-        return self.network.train_step(ListDataset(trajlist), lr)
 
 
 class StochasticPolicyNetwork(TFNet):
@@ -147,9 +146,9 @@ class DeterministicPolicyNetwork(TFNet):
 
     def sample_act(self, obs, noise_var=1.):
         obs = np.expand_dims(obs, axis=0)
-        act = self.run(self.pol_out, {self.obs: obs})
+        act = self.run(self.pol_out, {self.obs: obs})[0]
         if noise_var > 0:
-            noise = np.random.randn(act.shape)*noise_var
+            noise = np.random.randn(*act.shape)*noise_var
         else:
             noise = 0
         return act + noise

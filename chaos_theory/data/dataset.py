@@ -37,6 +37,12 @@ class Trajectory(object):
         return np.sum(self.rew)
 
 
+def to_dataset(l):
+    if isinstance(l, Dataset):
+        return l
+    return ListDataset(l)
+
+
 class Dataset(object):
     __metaclass__ = ABCMeta
 
@@ -63,7 +69,6 @@ class Dataset(object):
                 pass
             def __getattr__(self, name):
                 values = [getattr(data, name) for data in data_list]
-                import pdb; pdb.set_trace()
                 return np.array(values).astype(FLOAT_X)
         return Dispatch()
 
