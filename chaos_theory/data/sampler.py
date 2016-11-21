@@ -7,11 +7,11 @@ from chaos_theory.data import ListDataset
 class BatchSampler(object):
     def __init__(self, data):
         self.data = data
-        self.num_data = len(data)
 
     def with_replacement(self, batch_size=5):
+        num_data = len(self.data)
         while True:
-            batch_idx = np.random.randint(0, self.num_data, size=batch_size)
+            batch_idx = np.random.randint(0, num_data, size=batch_size)
             yield ListDataset([self.data[idx] for idx in batch_idx])
 
 

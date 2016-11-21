@@ -3,25 +3,21 @@ from abc import ABCMeta, abstractmethod
 import logging
 
 from chaos_theory.data import BatchSampler
+from chaos_theory.utils import get_wt_string, restore_wt_string
 
 LOGGER = logging.getLogger(__name__)
 
-class TFNet(object):
+class TFContext(object):
+    """
+    Helper (like TFNet) which can manage multiple networks living in the same graph
+    """
     __metaclass__ = ABCMeta
-
-    def __init__(self, **build_args):
-        #self.__graph = tf.Graph()
-        self.__graph = tf.get_default_graph()
-        with self.__graph.as_default():
-            self.build_network(**build_args)
+    def __init__(self, graph=None, sess=None):
+        self.__graph = graph if graph else tf.get_default_graph()
+        self.__sess = sess if sess else tf.Session(graph=self.__graph)
         self.__init_network()
 
-    @abstractmethod
-    def build_network(self, **kwargs):
-        raise NotImplementedError()
-
     def __init_network(self):
-        self.__sess = tf.Session(graph=self.__graph)
         with self.__graph.as_default():
             self.saver = tf.train.Saver(tf.trainable_variables())
             self.__sess.run(tf.initialize_all_variables())
@@ -36,6 +32,34 @@ class TFNet(object):
             tvars = tf.trainable_variables()
         tvals = self.run(tvars)
         return {tvars[i].name: tvals[i] for i in range(len(tvars))}
+
+    @property
+    def sess(self):
+        return self.__sess
+
+    @property
+    def graph(self):
+        return self.__graph
+
+    def __getstate__(self):
+        return {'__wts': get_wt_string(self.saver, self.sess)}
+
+    def __setstate__(self, state):
+        restore_wt_string(self.saver, self.sess, state['__wts'])
+
+
+class TFNet(TFContext):
+    def __init__(self, **build_args):
+        graph = tf.get_default_graph()
+        with graph.as_default():
+            self.build_network(**build_args)
+        sess = tf.Session(graph=graph)
+        super(TFNet, self).__init__(graph, sess)
+
+    @abstractmethod
+    def build_network(self, **kwargs):
+        raise NotImplementedError()
+
 
     def fit(self, dataset, heartbeat=100, max_iter=float('inf'), batch_size=10, lr=1e-3):
         sampler = BatchSampler(dataset)
@@ -52,17 +76,3 @@ class TFNet(object):
     @abstractmethod
     def train_step(self, batch, lr):
         raise NotImplementedError()
-
-    @property
-    def sess(self):
-        return self.__sess
-
-    @property
-    def graph(self):
-        return self.__graph
-
-    def __getstate__(self):
-        return {'__wts': get_wt_string(self.saver, self.sess)}
-
-    def __setstate__(self, state):
-        restore_wt_string(self.saver, self.sess, state['__wts'])

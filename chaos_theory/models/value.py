@@ -9,13 +9,13 @@ from chaos_theory.utils import linear
 from .tf_network import TFNet
 
 
-ValueDataPoint = namedtuple('DataPoint', ['obs', 'act', 'value'])
+ValueDataPoint = namedtuple('DataPoint', ['obs', 'act', 'returns'])
 
 
 def create_value_datapoints(traj):
     dataset = []
     for t in range(len(traj)):
-        dataset.append(ValueDataPoint(traj.obs[t], traj.act[t], traj.disc_rew[t]))
+        dataset.append(ValueDataPoint(traj.obs[t], traj.act[t], traj.returns[t]))
     return dataset
 
 
@@ -40,7 +40,7 @@ class ValueNetwork(TFNet):
     def train_step(self, batch, lr):
         return self.run([self.loss, self.train_op], {self.lr:lr,
                                                      self.obs: batch.stack.obs,
-                                                     self.value_labels: batch.stack.value})[0]
+                                                     self.value_labels: batch.stack.returns})[0]
 
 
 class QNetwork(TFNet):
@@ -68,8 +68,7 @@ class QNetwork(TFNet):
         return self.run([self.loss, self.train_op], {self.lr: lr,
                                                      self.obs: batch.stack.obs,
                                                      self.action: batch.stack.act,
-                                                     self.q_labels: batch.stack.value})[0]
-
+                                                     self.q_labels: batch.stack.returns})[0]
 
 def linear_value_fn(state):
     value = linear(state, dout=1)

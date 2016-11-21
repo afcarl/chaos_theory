@@ -30,6 +30,11 @@ def linear_softmax_policy():
         return dist
     return inner
 
+def linear_deterministic_policy():
+    def inner(obs, dU, reuse=False):
+        return linear(obs, dout=dU)
+    return inner
+
 
 def relu_gaussian_policy(num_hidden=1, dim_hidden=10, min_std=0.0, mean_clamp=None):
     def inner(obs, dU, reuse=False):
@@ -62,6 +67,15 @@ class RandomPolicy(Policy):
         return self.action_space.sample()
 
 
+class GreedyPolicy(Policy):
+    def __init__(self, q_net):
+        super(GreedyPolicy, self).__init__()
+        self.q_net = q_net
+
+    def act(self, obs):
+        raise NotImplementedError()
+
+
 class ContinuousPolicy(Policy):
     def __init__(self, network):
         super(ContinuousPolicy, self).__init__()
@@ -77,15 +91,15 @@ class ContinuousPolicy(Policy):
         return self.network.train_step(ListDataset(trajlist), lr)
 
 
-class PolicyNetwork(TFNet):
+class StochasticPolicyNetwork(TFNet):
     def __init__(self, action_space, obs_space, 
                 policy_network=linear_gaussian_policy(0.01),
                 ):
         self.dO = obs_space.shape[0]
         self.dU = action_space_dim(action_space)
-        super(PolicyNetwork, self).__init__(policy_network=policy_network,
-                                           dO=self.dO,
-                                           dU=self.dU)
+        super(StochasticPolicyNetwork, self).__init__(policy_network=policy_network,
+                                                      dO=self.dO,
+                                                      dU=self.dU)
         self.obs_space = obs_space
         self.action_space = action_space
         self.policy_network = policy_network
@@ -112,3 +126,46 @@ class PolicyNetwork(TFNet):
 
     def train_step(self, batch, lr):
         raise NotImplementedError()
+
+
+class DeterministicPolicyNetwork(TFNet):
+    def __init__(self, action_space, obs_space,
+                 policy_network=linear_deterministic_policy(),
+                 ):
+        self.dO = obs_space.shape[0]
+        self.dU = action_space_dim(action_space)
+        super(DeterministicPolicyNetwork, self).__init__(policy_network=policy_network,
+                                                         dO=self.dO,
+                                                         dU=self.dU)
+        self.obs_space = obs_space
+        self.action_space = action_space
+        self.policy_network = policy_network
+
+    def build_network(self, policy_network, dO, dU):
+        self.obs = tf.placeholder(tf.float32, [None, dO], name='obs')
+        self.pol_out = policy_network(self.obs, dU)
+
+    def sample_act(self, obs, noise_var=1.):
+        obs = np.expand_dims(obs, axis=0)
+        act = self.run(self.pol_out, {self.obs: obs})
+        if noise_var > 0:
+            noise = np.random.randn(act.shape)*noise_var
+        else:
+            noise = 0
+        return act + noise
+
+    def action_entropy(self, obs):
+        return 0
+
+    def train_step(self, batch, lr):
+        raise NotImplementedError()
+
+    @property
+    def action_tensor(self):
+        return self.pol_out
+
+    @property
+    def obs_tensor(self):
+        return self.obs
+
+

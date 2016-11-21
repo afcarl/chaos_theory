@@ -1,12 +1,14 @@
 import tensorflow as tf
 
+from chaos_theory.algorithm.algorithm import Algorithm
 from chaos_theory.data import ListDataset
 from chaos_theory.models.advantage import Advantage
 from chaos_theory.utils import assert_shape
 
 
-class ReinforceGrad():
+class ReinforceGrad(Algorithm):
     def __init__(self, normalize_rewards=True, advantage=Advantage(), pol_network=None):
+        super(ReinforceGrad, self).__init__()
         self.advantage = advantage
         self.normalize_rewards = normalize_rewards
         self.policy_net = pol_network
@@ -48,13 +50,18 @@ class ReinforceGrad():
         self.sess = self.policy_net.sess
         self.sess.run(tf.initialize_all_variables())
 
-    def update(self, samples, lr):
+    def update(self, samples, **args):
+        lr = args.get('lr', 5e-3)
+
+        # Compute advantage function
         self.advantage.update(samples)
         batch = ListDataset(samples)
-        return self.sess.run([self.surr_loss, self.train_op], {
+
+        # Compute policy gradient
+        loss, __ = self.sess.run([self.surr_loss, self.train_op], {
                                                           self.lr: lr,
                                                           self.obs_surr: batch.concat.obs,
                                                           self.act_surr: batch.concat.act,
                                                           self.batch_size: len(batch),
-                                                          self.returns_surr: batch.concat.returns})[0]
-
+                                                          self.returns_surr: batch.concat.returns})
+        return loss
