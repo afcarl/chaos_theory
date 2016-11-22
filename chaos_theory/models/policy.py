@@ -2,6 +2,8 @@ import tensorflow as tf
 import numpy as np
 import logging
 
+from gym.spaces import Box
+
 from chaos_theory.algorithm.reinforce import ReinforceGrad
 from chaos_theory.data import ListDataset
 from chaos_theory.distribution.categorical import SoftmaxDistribution
@@ -30,10 +32,20 @@ def linear_softmax_policy():
         return dist
     return inner
 
-def linear_deterministic_policy():
+def tanh_deterministic_policy(action_space, act_slack=1.0, dim_hidden=10, num_hidden=0):
+    assert isinstance(action_space, Box)
+    low = action_space.low
+    high = action_space.high
+    mid = (low+high)/2
+    diff = high-low
+    diff *= act_slack
     def inner(obs, dU, reuse=False):
+        out = obs
         with tf.variable_scope('policy', reuse=reuse):
-            pol = linear(obs, dout=dU)
+            for i in range(num_hidden):
+                out = tf.nn.relu(linear(out, dout=dim_hidden, name='layer_%d'%i))
+            out = linear(out, dout=dU)
+            pol = tf.nn.tanh(out)*(diff/2) + mid
         return pol
     return inner
 
@@ -129,8 +141,8 @@ class StochasticPolicyNetwork(TFNet):
 
 class DeterministicPolicyNetwork(TFNet):
     def __init__(self, action_space, obs_space,
-                 policy_network=linear_deterministic_policy(),
-                 noise=1e-3
+                 policy_network,
+                 exploration=None,
                  ):
         self.dO = obs_space.shape[0]
         self.dU = action_space_dim(action_space)
@@ -140,7 +152,7 @@ class DeterministicPolicyNetwork(TFNet):
         self.obs_space = obs_space
         self.action_space = action_space
         self.policy_network = policy_network
-        self.noise = noise
+        self.exploration=exploration
 
     def build_network(self, policy_network, dO, dU):
         self.obs = tf.placeholder(tf.float32, [None, dO], name='obs')
@@ -149,11 +161,9 @@ class DeterministicPolicyNetwork(TFNet):
     def sample_act(self, obs):
         obs = np.expand_dims(obs, axis=0)
         act = self.run(self.pol_out, {self.obs: obs})[0]
-        if self.noise > 0:
-            noise = np.random.randn(*act.shape)*self.noise
-        else:
-            noise = 0
-        return act + noise
+        if self.exploration:
+            act = self.exploration.add_noise(act)
+        return act
 
     def action_entropy(self, obs):
         return 0

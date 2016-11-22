@@ -20,12 +20,13 @@ def compute_sars(traj):
 
 
 class CriticQNetwork(TFContext):
-    def __init__(self, sess, obs_space, action_space, network_arch, actor):
+    def __init__(self, sess, obs_space, action_space, network_arch, actor, weight_decay=1e-2):
         self.dO = obs_space.shape[0]
         self.dU = action_space.shape[0]
         self.obs_space = obs_space
         self.action_space = action_space
         self.actor = actor
+        self.weight_decay = weight_decay
         self.build_network(network_arch, actor, self.dO, self.dU)
         super(CriticQNetwork, self).__init__(sess=sess)
 
@@ -38,18 +39,23 @@ class CriticQNetwork(TFContext):
             assert_shape(self.obs, [None, dO])
             assert_shape(self.action, [None, dU])
             self.q_pol = network_arch(self.obs, self.action)
-            self.actor_op = tf.train.AdamOptimizer(self.lr).minimize(-self.q_pol)
+            assert_shape(self.q_pol, [None, 1])
+            self.q_avg = tf.reduce_mean(self.q_pol, reduction_indices=[0])
+            assert_shape(self.q_avg, [1])
+            self.actor_op = tf.train.AdamOptimizer(self.lr).minimize(-self.q_avg)
 
             # Supervised action
             self.sup_obs = tf.placeholder(tf.float32, [None, dO], name='sup_obs')
             self.sup_action = tf.placeholder(tf.float32, [None, dU], name='sup_act')
             self.q_labels = tf.placeholder(tf.float32, [None], name='sup_qlabels')
             self.q_pred = network_arch(self.sup_obs, self.sup_action, reuse=True)
-            self.loss = tf.reduce_mean(tf.square(self.q_labels - self.q_pred))
-            optimizer = tf.train.AdamOptimizer(self.lr)
-            self.train_op = optimizer.minimize(self.loss)
 
             self.trainable_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=vs.name)
+
+            l2_reg = tf.reduce_sum([tf.nn.l2_loss(var) for var in self.trainable_vars])
+            self.loss = tf.reduce_mean(tf.square(self.q_labels - self.q_pred))
+            optimizer = tf.train.AdamOptimizer(self.lr)
+            self.train_op = optimizer.minimize(self.loss + self.weight_decay*l2_reg)
 
     def update_policy(self, batch, lr):
         return self.run(self.actor_op, {self.lr: lr,
@@ -97,7 +103,7 @@ class TargetQNetwork(TFContext):
 
     def compute_returns(self, batch, discount=1.0):
         returns = self.run(self.q_pred, {self.obs: batch.stack.obs})
-        returns = discount*returns[:,0] + batch.stack.rew
+        returns = returns[:,0]*discount + batch.stack.rew
 
         data = []
         for i in range(len(batch)):

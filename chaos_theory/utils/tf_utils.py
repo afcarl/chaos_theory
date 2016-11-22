@@ -7,13 +7,17 @@ from collections import deque, defaultdict
 import tensorflow as tf
 import numpy as np
 
+from chaos_theory.utils.config import FLOAT_X
+
 LOGGER = logging.getLogger(__name__)
 
 
 def linear(input, dout=None, name=''):
     _, din = input.get_shape()
-    W = tf.get_variable('W'+name, (din, dout))
-    b = tf.get_variable('b'+name, (dout))
+    init = 1.0/np.sqrt(int(din))
+    Winit = np.random.uniform(low=-init, high=init, size=(din, dout)).astype(np.float32)
+    W = tf.get_variable('W'+name, initializer=tf.constant(Winit))
+    b = tf.get_variable('b'+name, initializer=tf.constant(np.zeros(dout).astype(np.float32)))
     return tf.matmul(input, W)+b
 
 

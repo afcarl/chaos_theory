@@ -25,6 +25,7 @@ def rollout(env, policy, render=True, max_length=float('inf')):
     act_list = []
     info_list = []
     t = 0
+    clamps = 0
 
     while not done:
         a_raw = a = policy.act(obs)
@@ -36,6 +37,7 @@ def rollout(env, policy, render=True, max_length=float('inf')):
             # Clamp actions space
             if not env.action_space.contains(a):
                 a = clamp_actions(env.action_space, a)
+                clamps += 1
 
         obs, rew, done, info = env.step(a)
         if render:
@@ -52,6 +54,9 @@ def rollout(env, policy, render=True, max_length=float('inf')):
             break
     obs_list.pop(-1)
 
+    if clamps > 0.2 * t:
+        print 'WARNING: Lots of clamps:', clamps
+
     traj = Trajectory(obs_list, act_list, rew_list, info_list)
     return traj
 
@@ -59,7 +64,12 @@ def rollout(env, policy, render=True, max_length=float('inf')):
 def online_rollout(env, policy, alg, render=False, max_length=float('inf')):
     obs = env.reset()
     done = False
+    obs_list = [obs]  #TODO: This is a bug? But for some reason works much better
+    rew_list = []
+    act_list = []
+    info_list = []
     t = 0
+    clamps = 0
 
     while not done:
         a_raw = a = policy.act(obs)
@@ -70,6 +80,7 @@ def online_rollout(env, policy, alg, render=False, max_length=float('inf')):
             # Clamp actions space
             if not env.action_space.contains(a):
                 a = clamp_actions(env.action_space, a)
+                clamps += 1
 
         new_obs, rew, done, info = env.step(a)
         if render:
@@ -77,10 +88,21 @@ def online_rollout(env, policy, alg, render=False, max_length=float('inf')):
 
         alg.update(obs, a, rew, new_obs)
         obs = new_obs
+
+        obs_list.append(obs)
+        act_list.append(a_raw)
+        rew_list.append(rew)
+        info_list.append(info)
         t += 1
         if t >= max_length:
             break
+    obs_list.pop(-1)
 
+    if clamps > 0.2 * t:
+        print 'WARNING: Lots of clamps:', clamps
+
+    traj = Trajectory(obs_list, act_list, rew_list, info_list)
+    return traj
 
 
 GLOBAL_POOL = None

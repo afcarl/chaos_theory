@@ -1,6 +1,6 @@
 from chaos_theory.algorithm.reinforce import ReinforceGrad
 from chaos_theory.models.advantage import LinearBaseline
-from chaos_theory.models.policy import StochasticPolicyNetwork, ContinuousPolicy, relu_gaussian_policy, linear_softmax_policy
+from chaos_theory.models.policy import StochasticPolicyNetwork, NNPolicy, relu_gaussian_policy, linear_softmax_policy
 from chaos_theory.sample import sample, rollout
 from utils.utils import print_stats
 import numpy as np
@@ -31,7 +31,7 @@ def main():
     network = StochasticPolicyNetwork(env.action_space, env.observation_space,
                                       policy_network=policy_arch)
     algorithm = ReinforceGrad(pol_network=network)
-    pol = ContinuousPolicy(network)
+    pol = NNPolicy(network)
 
     disc = 0.90
     for itr in range(10000):
