@@ -8,6 +8,8 @@ Usage
 
 """
 import itertools
+import time
+import inspect
 
 class Sweeper(object):
     def __init__(self, hyper_config):
@@ -18,13 +20,24 @@ class Sweeper(object):
             yield {key:config[i] for i, key in enumerate(self.hyper_config.keys())}
 
 
+def create_name(hyper_dict, use_time=True):
+    ts = ''
+    if use_time:
+        ts = '_ts'+str(time.time())
+
+    return ('_'.join([str(k)+str(v) for k,v in hyper_dict.iteritems()])) + ts
+
+
 def example_run_method(param1=1., param2=2, param3=3, param4=4):
     print param1, param2, param3, param4
 
 
 def run_sweep(run_method, params):
     sweeper = Sweeper(params)
+    args, varargs, varkw, defaults = inspect.getargspec(run_method)
     for config in sweeper:
+        if 'hyperparam_string' in args:
+            config['hyperparam_string'] = create_name(config)
         run_method(**config)
 
 if __name__ == "__main__":
