@@ -13,13 +13,17 @@ LOGGER = ColorLogger(__name__)
 
 class DDPG(OnlineAlgorithm):
     def __init__(self, obs_space, action_space, q_network, pol_network,
-                 discount=0.99, noise_sigma=0.1, scale_rew=1.0):
+                 discount=0.99, noise_sigma=0.1, scale_rew=1.0,
+                 actor_lr=1e-4, q_lr=1e-3, track_tau=0.001):
         super(DDPG, self).__init__()
         self.q_network = q_network
         self.obs_space = obs_space
         self.action_space = action_space
         self.discount = discount
         self.scale_rew = scale_rew
+        self.actor_lr=actor_lr
+        self.q_lr=q_lr
+        self.track_tau = track_tau
         self.min_batch_size = 1e3
 
         self.replay_buffer = FIFOBuffer(capacity=1e6)
@@ -49,10 +53,11 @@ class DDPG(OnlineAlgorithm):
         for batch in self.batch_sampler.with_replacement(batch_size=32, max_itr=1):
             batch = self.target_network.compute_returns(batch, discount=self.discount)
 
-            self.critic_network.train_step(batch, lr=1e-3)
-            self.critic_network.update_policy(batch, lr=1e-4)
+            self.critic_network.train_step(batch, lr=self.actor_lr)
+            self.critic_network.update_policy(batch, lr=self.q_lr)
 
         # Track critic & policy
-        self.target_network.track(0.001)
-        self.target_actor.track(0.001)
-        return float('NaN')
+        self.target_network.track(self.track_tau)
+        self.target_actor.track(self.track_tau)
+
+

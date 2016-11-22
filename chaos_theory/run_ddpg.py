@@ -19,7 +19,7 @@ ENV = 'InvertedPendulum-v1'
 #ENV = 'HalfCheetah-v1'
 #ENV = 'Hopper-v1'
 
-MAX_LENGTH = 500
+MAX_LENGTH = 200
 
 def main():
     """docstring for main"""
@@ -29,7 +29,7 @@ def main():
     q_network = relu_q_fn(num_hidden=1, dim_hidden=10)
 
     algorithm = DDPG(env.observation_space, env.action_space,
-                     q_network, policy_arch, discount=0.9, noise_sigma=0.1)
+                     q_network, policy_arch, discount=0.9, noise_sigma=0.2)
     pol = NNPolicy(algorithm.actor)
 
     for itr in range(10000):
@@ -42,9 +42,8 @@ def main():
         #samps = sample(env, pol, max_length=MAX_LENGTH, max_samples=10)
         #algorithm.update(samps)
         print_stats(itr, pol, env, samples)
-        #if itr % 5 == 0:
-        #    samp = rollout(env, pol, max_length=MAX_LENGTH)
-        #    pass
+        if itr % 5 == 0 and itr>0:
+            rollout(env, pol, max_length=MAX_LENGTH)
 
 if __name__ == "__main__":
     main()
