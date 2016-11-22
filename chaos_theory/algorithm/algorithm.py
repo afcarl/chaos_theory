@@ -11,5 +11,5 @@ class OnlineAlgorithm(object):
     def __init__(self):
         pass
 
-    def update(self, s, a, r, sn):
+    def update(self, s, a, r, sn, done):
         raise NotImplementedError()

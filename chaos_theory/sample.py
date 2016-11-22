@@ -85,10 +85,8 @@ def online_rollout(env, policy, alg, render=False, max_length=float('inf')):
         new_obs, rew, done, info = env.step(a)
         if render:
             env.render()
-
-        alg.update(obs, a, rew, new_obs)
+        alg.update(obs, a, rew, new_obs, done)
         obs = new_obs
-
         obs_list.append(obs)
         act_list.append(a_raw)
         rew_list.append(rew)

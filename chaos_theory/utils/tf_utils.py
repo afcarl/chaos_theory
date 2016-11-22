@@ -12,12 +12,16 @@ from chaos_theory.utils.config import FLOAT_X
 LOGGER = logging.getLogger(__name__)
 
 
-def linear(input, dout=None, name=''):
+def linear(input, dout=None, bias=True, name=''):
     _, din = input.get_shape()
     init = 1.0/np.sqrt(int(din))
     Winit = np.random.uniform(low=-init, high=init, size=(din, dout)).astype(np.float32)
     W = tf.get_variable('W'+name, initializer=tf.constant(Winit))
-    b = tf.get_variable('b'+name, initializer=tf.constant(np.zeros(dout).astype(np.float32)))
+
+    b = 0
+    if bias:
+        b = tf.get_variable('b'+name, initializer=tf.constant(np.zeros(dout).astype(np.float32)))
+
     return tf.matmul(input, W)+b
 
 

@@ -83,6 +83,13 @@ def linear_q_fn(state, action, reuse=False):
     return a1+a2
 
 
+def pointmass_q_star(state, action, reuse=False):
+    with tf.variable_scope('q_function', reuse=reuse):
+        a1 = linear(state, dout=1, name='state')*0.01
+        a2 = linear(action, dout=1, bias=False, name='act') + 0.1*action
+    return a1+a2
+
+
 def relu_q_fn(num_hidden=1, dim_hidden=10):
     def inner(state, action, reuse=False):
         sout = state

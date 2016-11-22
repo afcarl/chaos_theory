@@ -11,7 +11,7 @@ from chaos_theory.utils.progressbar import progress_itr
 
 MAX_LENGTH = 200
 
-def run(env='InvertedPendulum-v1', verbose_trial=False, max_iter=50,
+def run(env='InvertedPendulum-v1', verbose_trial=False, max_iter=100,
         discount=0.9, noise_sigma=0.2, actor_lr=1e-4, q_lr=1e-3, hyperparam_string=''):
     tf.reset_default_graph()
     logger = TBLogger('ddpg_'+hyperparam_string, {'rew', 'len'})
@@ -48,8 +48,10 @@ def run(env='InvertedPendulum-v1', verbose_trial=False, max_iter=50,
 
 
 HYPERPARAMS = {
-    'discount': [0.9,0.95,0.99],
+    'discount': [0.9,0.95],
     'noise_sigma': [0.1,0.2,0.3],
+    'actor_lr': [1e-3,1e-4],
+    'q_lr': [1e-3,1e-4]
 }
 
 if __name__ == "__main__":

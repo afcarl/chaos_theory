@@ -101,6 +101,9 @@ class NNPolicy(Policy):
     def act_entropy(self, obs):
         return self.network.action_entropy(obs)
 
+    def reset(self):
+        self.network.reset()
+
 
 class StochasticPolicyNetwork(TFNet):
     def __init__(self, action_space, obs_space, 
@@ -166,6 +169,9 @@ class DeterministicPolicyNetwork(TFNet):
         if self.exploration:
             act = self.exploration.add_noise(act)
         return act
+
+    def reset(self):
+        self.exploration.reset()
 
     def action_entropy(self, obs):
         return 0
