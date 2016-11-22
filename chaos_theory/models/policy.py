@@ -155,8 +155,10 @@ class DeterministicPolicyNetwork(TFNet):
         self.exploration=exploration
 
     def build_network(self, policy_network, dO, dU):
-        self.obs = tf.placeholder(tf.float32, [None, dO], name='obs')
-        self.pol_out = policy_network(self.obs, dU)
+        with tf.variable_scope('policy') as vs:
+            self.obs = tf.placeholder(tf.float32, [None, dO], name='obs')
+            self.pol_out = policy_network(self.obs, dU)
+            self.trainable_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=vs.name)
 
     def sample_act(self, obs):
         obs = np.expand_dims(obs, axis=0)

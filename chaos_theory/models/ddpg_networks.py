@@ -74,12 +74,12 @@ class CriticQNetwork(TFContext):
 
 
 class TargetQNetwork(TFContext):
-    def __init__(self, sess, obs_space, action_space, network_arch, critic_network):
+    def __init__(self, sess, obs_space, action_space, network_arch, target_actor, critic_network):
         self.dO = obs_space.shape[0]
         self.dU = action_space.shape[0]
         self.obs_space = obs_space
         self.action_space = action_space
-        self.actor = critic_network.actor
+        self.actor = target_actor
         self.critic_network = critic_network
         self.build_network(network_arch)
         super(TargetQNetwork, self).__init__(sess=sess)
@@ -119,3 +119,44 @@ class TargetQNetwork(TFContext):
 
     def train_step(self, batch, lr):
         raise NotImplementedError()
+
+
+class TargetPolicyNetwork(TFContext):
+    def __init__(self, actor,
+                 policy_network,
+                 sess=None):
+        self.actor = actor
+        self.dO = actor.dO
+        self.dU = actor.dU
+        self.policy_network = policy_network
+        self.build_network(policy_network)
+        super(TargetPolicyNetwork, self).__init__(sess=sess)
+
+    def build_network(self, policy_network):
+        with tf.variable_scope('target_policy') as vs:
+            self.obs = tf.placeholder(tf.float32, [None, self.dO], name='obs')
+            self.pol_out = policy_network(self.obs, self.dU)
+
+            self.track_rate = tf.placeholder(tf.float32, name='track_rate')
+            self.trainable_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=vs.name)
+
+            self.track_ops = [tf.assign(self.trainable_vars[i],
+                                        (1-self.track_rate)*self.trainable_vars[i] + (self.track_rate)*self.actor.trainable_vars[i])
+                              for i in range(len(self.trainable_vars))]
+
+            self.copy_op = [tf.assign(self.trainable_vars[i], self.actor.trainable_vars[i])
+                            for i in range(len(self.trainable_vars))]
+
+    def track(self, lr):
+        self.sess.run(self.track_ops, {self.track_rate: lr})
+
+    def copy_actor(self):
+        self.sess.run(self.copy_op)
+
+    @property
+    def action_tensor(self):
+        return self.pol_out
+
+    @property
+    def obs_tensor(self):
+        return self.obs
