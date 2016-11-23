@@ -3,7 +3,7 @@ import logging
 import gym
 import numpy as np
 
-from chaos_theory.algorithm.ddpg2 import DDPG2
+from chaos_theory.algorithm import DDPG2
 from chaos_theory.run.run_algorithm import run_online_algorithm
 
 logging.basicConfig(level=logging.DEBUG)

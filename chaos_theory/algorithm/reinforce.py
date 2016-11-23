@@ -3,7 +3,7 @@ import tensorflow as tf
 from chaos_theory.algorithm.algorithm import BatchAlgorithm
 from chaos_theory.data import ListDataset
 from chaos_theory.models.advantage import Advantage
-from chaos_theory.models.policy import StochasticPolicyNetwork
+from chaos_theory.models.policy import StochasticPolicyNetwork, NNPolicy
 from chaos_theory.utils import assert_shape
 
 
@@ -13,6 +13,7 @@ class ReinforceGrad(BatchAlgorithm):
                  lr=5-3):
         super(ReinforceGrad, self).__init__()
         self.advantage = advantage
+        self.lr_val = lr
         self.normalize_rewards = normalize_rewards
         policy = StochasticPolicyNetwork(env.action_space, env.observation_space,
                                             policy_network=pol_network)
@@ -22,7 +23,7 @@ class ReinforceGrad(BatchAlgorithm):
         self.discount = discount
         self.__compute_surr()
 
-    def surr_loss(self, obs_tensor, act_tensor, returns_tensor, batch_size, pol_network):
+    def __surr_loss(self, obs_tensor, act_tensor, returns_tensor, batch_size, pol_network):
         # Compute advantages
         advantage = self.advantage.apply(returns_tensor, act_tensor, obs_tensor)
         if self.normalize_rewards:
@@ -47,7 +48,7 @@ class ReinforceGrad(BatchAlgorithm):
         self.returns_surr = tf.placeholder(tf.float32, [None], name='ret_surr')
         self.batch_size = tf.placeholder(tf.float32, (), name='batch_size')
 
-        self.surr_loss = self.surr_loss(self.obs_surr, self.act_surr,
+        self.surr_loss = self.__surr_loss(self.obs_surr, self.act_surr,
                                    self.returns_surr, self.batch_size,
                                    self.policy_net.policy_network)
         optimizer = tf.train.AdamOptimizer(self.lr)
@@ -65,7 +66,7 @@ class ReinforceGrad(BatchAlgorithm):
 
         # Compute policy gradient
         loss, __ = self.sess.run([self.surr_loss, self.train_op], {
-                                                          self.lr: lr,
+                                                          self.lr: self.lr_val,
                                                           self.obs_surr: batch.concat.obs,
                                                           self.act_surr: batch.concat.act,
                                                           self.batch_size: len(batch),
@@ -73,4 +74,4 @@ class ReinforceGrad(BatchAlgorithm):
         return loss
 
     def get_policy(self):
-        return NNPolicy()
+        return NNPolicy(self.policy_net)

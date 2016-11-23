@@ -1,8 +1,7 @@
 import gym
 import tensorflow as tf
 
-from chaos_theory.algorithm.ddpg import DDPG
-from chaos_theory.algorithm.ddpg2 import two_layer_policy, two_layer_q
+from chaos_theory.algorithm import DDPG, two_layer_policy, two_layer_q
 from chaos_theory.run.run_algorithm import run_online_algorithm
 from chaos_theory.utils.hyper_sweep import run_sweep
 

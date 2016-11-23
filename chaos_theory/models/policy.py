@@ -71,6 +71,9 @@ class Policy(object):
     def act(self, obs):
         raise NotImplementedError()
 
+    def reset(self):
+        pass
+
 
 class RandomPolicy(Policy):
     """docstring for RandomPolicy"""
