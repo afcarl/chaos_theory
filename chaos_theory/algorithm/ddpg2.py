@@ -10,6 +10,7 @@ from chaos_theory.data import FIFOBuffer, BatchSampler
 # DDPG Agent
 #
 from chaos_theory.models.ddpg_networks import SARSData
+from chaos_theory.models.exploration import OUStrategy
 
 
 class DDPG2(OnlineAlgorithm):
@@ -43,6 +44,8 @@ class DDPG2(OnlineAlgorithm):
             allow_soft_placement=True,
             gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=0.1)))
 
+        self.exploration = OUStrategy(env.action_space, theta=noise_theta, sigma=noise_sigma)
+
         # create tf computational graph
         #
         self.theta_p = theta_p(dimO, dimA, l1size, l2size)
@@ -50,60 +53,40 @@ class DDPG2(OnlineAlgorithm):
         self.theta_pt, update_pt = exponential_moving_averages(self.theta_p, track_tau)
         self.theta_qt, update_qt = exponential_moving_averages(self.theta_q, track_tau)
 
-        obs = tf.placeholder(tf.float32, [None, dimO], "obs")
-        act_test = policy(obs, self.theta_p)
-
-        # explore
-        noise_init = tf.zeros([1, dimA])
-        noise_var = tf.Variable(noise_init)
-        self.ou_reset = noise_var.assign(noise_init)
-        noise = noise_var.assign_sub((noise_theta) * noise_var - tf.random_normal([dimA], stddev=noise_sigma))
-        act_expl = act_test + noise
+        self.obs = tf.placeholder(tf.float32, [None, dimO], "obs")
+        self.act_test = policy(self.obs, self.theta_p)
 
         # q optimization
-        act_train = tf.placeholder(tf.float32, [None, dimA], "act_train")
-        rew = tf.placeholder(tf.float32, [None], "rew")
-        obs2 = tf.placeholder(tf.float32, [None, dimO], "obs2")
-        term2 = tf.placeholder(tf.bool, [None], "term2")
+        self.act_train = tf.placeholder(tf.float32, [None, dimA], "act_train")
+        self.rew = tf.placeholder(tf.float32, [None], "rew")
+        self.obs2 = tf.placeholder(tf.float32, [None, dimO], "obs2")
+        self.term2 = tf.placeholder(tf.bool, [None], "term2")
 
         # policy loss
-        act_train_policy = policy(obs, self.theta_p)
-        q_train_policy = qfunction(obs, act_train_policy, self.theta_q)
+        act_train_policy = policy(self.obs, self.theta_p)
+        q_train_policy = qfunction(self.obs, act_train_policy, self.theta_q)
         meanq = tf.reduce_mean(q_train_policy, 0)
         wd_p = tf.add_n([pl2norm * tf.nn.l2_loss(var) for var in self.theta_p])  # weight decay
         loss_p = -meanq + wd_p
         # policy optimization
-        optim_p = tf.train.AdamOptimizer(learning_rate=actor_lr, epsilon=1e-4)
-        grads_and_vars_p = optim_p.compute_gradients(loss_p, var_list=self.theta_p)
-        optimize_p = optim_p.apply_gradients(grads_and_vars_p)
-        with tf.control_dependencies([optimize_p]):
-            train_p = tf.group(update_pt)
+        self.pol_optimize_op = tf.train.AdamOptimizer(learning_rate=actor_lr, epsilon=1e-4).minimize(loss_p, var_list=self.theta_p)
+        self.pol_track_op = tf.group(update_pt)
 
         # q
-        q_train = qfunction(obs, act_train, self.theta_q)
+        q_train = qfunction(self.obs, self.act_train, self.theta_q)
         # q targets
-        act2 = policy(obs2, theta=self.theta_pt)
-        q2 = qfunction(obs2, act2, theta=self.theta_qt)
-        q_target = tf.stop_gradient(tf.select(term2, rew, rew + discount * q2))
-        # q_target = tf.stop_gradient(rew + discount * q2)
+        act2 = policy(self.obs2, theta=self.theta_pt)
+        q2 = qfunction(self.obs2, act2, theta=self.theta_qt)
+        q_target = tf.stop_gradient(tf.select(self.term2, self.rew, self.rew + discount * q2))
+
         # q loss
         td_error = q_train - q_target
         ms_td_error = tf.reduce_mean(tf.square(td_error), 0)
         wd_q = tf.add_n([l2norm * tf.nn.l2_loss(var) for var in self.theta_q])  # weight decay
         loss_q = ms_td_error + wd_q
         # q optimization
-        optim_q = tf.train.AdamOptimizer(learning_rate=q_lr, epsilon=1e-4)
-        grads_and_vars_q = optim_q.compute_gradients(loss_q, var_list=self.theta_q)
-        optimize_q = optim_q.apply_gradients(grads_and_vars_q)
-        with tf.control_dependencies([optimize_q]):
-            train_q = tf.group(update_qt)
-
-        # tf functions
-        with self.sess.as_default():
-            self._act_test = Fun(obs, act_test)
-            self._act_expl = Fun(obs, act_expl)
-            self._reset = Fun([], self.ou_reset)
-            self._train = Fun([obs, act_train, rew, obs2, term2], [train_p, train_q, loss_q])#, summary_list, summary_writer)
+        self.q_optimize_op = tf.train.AdamOptimizer(learning_rate=q_lr, epsilon=1e-4).minimize(loss_q, var_list=self.theta_q)
+        self.q_track_op= tf.group(update_qt)
 
         self.sess.run(tf.initialize_all_variables())
 
@@ -116,12 +99,22 @@ class DDPG2(OnlineAlgorithm):
         for batch in BatchSampler(self.buffer).with_replacement(batch_size=32, max_itr=1):
             obs, act, rew, ob2, term2 = (batch.stack.obs, batch.stack.act, batch.stack.rew,
                                          batch.stack.obs_next, batch.stack.term_mask)
-            term2 = (1-term2).astype(np.bool)
-            _, _, loss = self._train(obs, act, rew, ob2, term2)
+            term2 = (1.0-term2).astype(np.bool)
+            #_, _, loss = self._train(obs, act, rew, ob2, term2)
+
+            self.sess.run(self.pol_optimize_op, {self.obs: obs})
+            self.sess.run(self.q_optimize_op, {self.obs: obs, self.act_train: act, self.rew: rew, self.obs2: ob2, self.term2: term2})
+
+            self.sess.run(self.q_track_op)
+            self.sess.run(self.pol_track_op)
+
+    def reset(self):
+        self.exploration.reset()
 
     def act(self, obs):
         obs = np.expand_dims(obs, axis=0)
-        action = self._act_expl(obs)
+        act = self.sess.run(self.act_test, feed_dict={self.obs: obs})
+        action = self.exploration.add_noise(act)
         action = np.clip(action, -1, 1)
         self.action = np.atleast_1d(np.squeeze(action, axis=0))  # TODO: remove this hack
         return self.action
@@ -129,41 +122,6 @@ class DDPG2(OnlineAlgorithm):
     def __del__(self):
         self.sess.close()
 
-
-# Tensorflow utils
-#
-class Fun:
-    """ Creates a python function that maps between inputs and outputs in the computational graph. """
-
-    def __init__(self, inputs, outputs, summary_ops=None, summary_writer=None, session=None):
-        self._inputs = inputs if type(inputs) == list else [inputs]
-        self._outputs = outputs
-        self._summary_op = tf.merge_summary(summary_ops) if type(summary_ops) == list else summary_ops
-        self._session = session or tf.get_default_session()
-        self._writer = summary_writer
-
-    def __call__(self, *args, **kwargs):
-        """
-        Arguments:
-          **kwargs: input values
-          log: if True write summary_ops to summary_writer
-          global_step: global_step for summary_writer
-        """
-        log = kwargs.get('log', False)
-
-        feeds = {}
-        for (argpos, arg) in enumerate(args):
-            feeds[self._inputs[argpos]] = arg
-
-        out = self._outputs + [self._summary_op] if log else self._outputs
-        res = self._session.run(out, feeds)
-
-        if log:
-            i = kwargs['global_step']
-            self._writer.add_summary(res[-1], global_step=i)
-            res = res[:-1]
-
-        return res
 
 def exponential_moving_averages(theta, tau=0.001):
     ema = tf.train.ExponentialMovingAverage(decay=1 - tau)
