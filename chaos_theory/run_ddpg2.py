@@ -24,7 +24,7 @@ MAX_LENGTH = 100
 def main():
     """docstring for main"""
     env = gym.make(ENV)
-    algorithm = DDPG2(env)
+    algorithm = DDPG2(env, track_tau=0.01, discount=0.9)
     #pol = NNPolicy(algorithm.actor)
     pol = algorithm
 

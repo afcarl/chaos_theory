@@ -47,6 +47,8 @@ class TFContext(object):
     def __setstate__(self, state):
         restore_wt_string(self.saver, self.sess, state['__wts'])
 
+    def __del__(self):
+        self.__sess.close()
 
 class TFNet(TFContext):
     def __init__(self, **build_args):
