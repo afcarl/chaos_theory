@@ -75,6 +75,11 @@ class StochPolicy(object):
             return self.probtype.sample(prob)[0], {"prob" : prob[0]}
         else:
             return self.probtype.maxprob(prob)[0], {"prob" : prob[0]}
+
+    def probs(self, ob):
+        prob_params = self._act_prob(ob[None])
+        return prob_params[0]
+
     def finalize(self):
         self._act_prob = theano.function([self.input], self.get_output(), **FNOPTS)
 

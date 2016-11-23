@@ -1,8 +1,9 @@
 import copy_reg, cPickle
 import numpy as np
 import theano, keras, keras.backend
+import theano.tensor as T
 
-floatX = theano.config.floatX  # pylint: disable=E1101
+floatX = 'float32' #theano.config.floatX  # pylint: disable=E1101
 keras.backend.set_floatx(floatX)
 keras.backend.set_epsilon(1e-7)
 

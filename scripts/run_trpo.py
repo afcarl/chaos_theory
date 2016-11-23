@@ -16,5 +16,5 @@ if __name__ == "__main__":
 
     algorithm = TRPO(env)
 
-    run_batch_algorithm(env, algorithm, samples_per_itr=10, alg_itrs=10000, verbose_trial=5,
+    run_batch_algorithm(env, algorithm, samples_per_itr=10, alg_itrs=10000, verbose_trial=-1,
                         max_length=100)

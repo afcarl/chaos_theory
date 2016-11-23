@@ -9,6 +9,9 @@ try:
 except ImportError:
     raise ImportError("TRPO requires keras and theano")
 
+if keras.backend.backend() !=  'theano':
+    raise ImportError("Please set keras backend to theano")
+
 import numpy as np
 
 from chaos_theory.algorithm import BatchAlgorithm
@@ -39,16 +42,24 @@ class TRPO(BatchAlgorithm, Policy):
         return self
 
     def act(self, obs):
-        return self.agent.act(obs)
+        action = self.agent.act(obs)
+        return action[0]
 
     def reset(self):
         pass
 
     def update(self, samples):
+        def terminated(T):
+            vals = [False]*T
+            vals[-1] = True
+            return vals
+
         paths = [{
             'observation': sample.obs,
             'reward': sample.rew,
-            'action': sample.act
+            'action': sample.act,
+            'terminated': terminated(sample.T),
+            'prob': [self.agent.probs(obs) for obs in sample.obs],
         } for sample in samples]
 
         compute_advantage(self.agent.baseline, paths, gamma=self.cfg["gamma"], lam=self.cfg["lam"])
@@ -152,6 +163,8 @@ class AgentWithPolicy(object):
         self.stochastic = stochastic
     def act(self, ob_no):
         return self.policy.act(ob_no, stochastic = self.stochastic)
+    def probs(self, ob_no):
+        return self.policy.probs(ob_no)
     def get_flat(self):
         return self.policy.get_flat()
     def set_from_flat(self, th):
@@ -160,15 +173,6 @@ class AgentWithPolicy(object):
         return self.obfilter(ob)
     def rewfilt(self, rew):
         return self.rewfilter(rew)
-
-class TrpoAgent(AgentWithPolicy):
-    options = MLP_OPTIONS + PG_OPTIONS + TrpoUpdater.options + FILTER_OPTIONS
-    def __init__(self, ob_space, ac_space, usercfg):
-        cfg = update_default_config(self.options, usercfg)
-        policy, self.baseline = make_mlps(ob_space, ac_space, cfg)
-        obfilter, rewfilter = make_filters(cfg, ob_space)
-        self.updater = TrpoUpdater(policy, cfg)
-        AgentWithPolicy.__init__(self, policy, obfilter, rewfilter)
 
 class TrpoUpdater(EzFlat, EzPickle):
     options = [
@@ -269,6 +273,16 @@ class TrpoUpdater(EzFlat, EzPickle):
             out[lname + "_before"] = lbefore
             out[lname + "_after"] = lafter
         return out
+
+
+class TrpoAgent(AgentWithPolicy):
+    options = MLP_OPTIONS + PG_OPTIONS + TrpoUpdater.options + FILTER_OPTIONS
+    def __init__(self, ob_space, ac_space, usercfg):
+        cfg = update_default_config(self.options, usercfg)
+        policy, self.baseline = make_mlps(ob_space, ac_space, cfg)
+        obfilter, rewfilter = make_filters(cfg, ob_space)
+        self.updater = TrpoUpdater(policy, cfg)
+        AgentWithPolicy.__init__(self, policy, obfilter, rewfilter)
 
 
 def linesearch(f, x, fullstep, expected_improve_rate, max_backtracks=10, accept_ratio=.1):
