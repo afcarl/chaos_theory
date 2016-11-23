@@ -1,8 +1,8 @@
 # chaos_theory
 
 Implementations of various RL algorithms using OpenAI Gym environments
-- REINFORCE
-- DDPG
+- [REINFORCE] (https://github.com/justinjfu/chaos_theory/blob/master/chaos_theory/algorithm/reinforce.py)
+- [DDPG] (https://github.com/justinjfu/chaos_theory/blob/master/chaos_theory/algorithm/ddpg_old.py)
 - NAF
 
 TODO:
@@ -14,8 +14,8 @@ Requirements
 ============
 
 - Python 2.7
-- OpenAI Gym (https://github.com/openai/gym)
-- Tensorflow (https://github.com/tensorflow/tensorflow)
+- [OpenAI Gym] (https://github.com/openai/gym)
+- [Tensorflow] (https://github.com/tensorflow/tensorflow)
 - Numpy/Scipy
 
 Optional Libraries
