@@ -1,22 +1,21 @@
 # chaos_theory
 
 Implementations of various RL algorithms using OpenAI Gym environments
-
-DONE:
 - REINFORCE
 - DDPG
+- NAF
 
 TODO:
-- NAF
 - TRPO/Natural Policy Gradients
+- QProp
 
 
 Requirements
 ============
 
 - Python 2.7
-- OpenAI Gym
-- Tensorflow
+- OpenAI Gym (https://github.com/openai/gym)
+- Tensorflow (https://github.com/tensorflow/tensorflow)
 - Numpy/Scipy
 
 
@@ -30,5 +29,5 @@ python scripts/run_reinforce.py
 
 DDPG Half-Cheetah experiment:
 ```
-python scripts/run_ddpg.py
+python scripts/run_ddpg2.py
 ````
