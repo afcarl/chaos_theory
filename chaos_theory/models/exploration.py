@@ -35,6 +35,22 @@ class OUStrategy(object):
         return np.clip(action + ou_state, self.action_space.low, self.action_space.high)
 
 
+class IIDStrategy(object):
+    """IID Gaussian noise"""
+    def __init__(self, action_space, sigma=0.2):
+        assert isinstance(action_space, Box)
+        assert len(action_space.shape) == 1
+        self.sigma = sigma
+        self.action_space = action_space
+        self.reset()
+
+    def reset(self):
+        pass
+
+    def add_noise(self, action):
+        noise = np.random.randn(*action.shape) * self.sigma
+        return np.clip(action + noise, self.action_space.low, self.action_space.high)
+
 if __name__ == "__main__":
     ou = OUStrategy(Box(low=-1, high=1, shape=(1,)), mu=0, theta=0.15, sigma=0.1)
     states = []

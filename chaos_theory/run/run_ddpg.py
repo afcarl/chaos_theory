@@ -12,16 +12,17 @@ from chaos_theory.utils.progressbar import progress_itr
 MAX_LENGTH = 200
 
 def run(env='InvertedPendulum-v1', verbose_trial=False, max_iter=100,
+        track_tau=0.001,
         discount=0.9, noise_sigma=0.2, actor_lr=1e-4, q_lr=1e-3, hyperparam_string=''):
     tf.reset_default_graph()
     logger = TBLogger('ddpg_'+hyperparam_string, {'rew', 'len'})
     env = gym.make(env)
-    policy_arch = tanh_deterministic_policy(env.action_space, dim_hidden=10, num_hidden=1)
-    q_network = relu_q_fn(num_hidden=1, dim_hidden=10)
+    policy_arch = tanh_deterministic_policy(env.action_space, dim_hidden=5, num_hidden=1)
+    q_network = relu_q_fn(num_hidden=1, dim_hidden=5)
 
     algorithm = DDPG(env.observation_space, env.action_space,
                      q_network, policy_arch, discount=discount, noise_sigma=noise_sigma,
-                     actor_lr=actor_lr, q_lr=q_lr, track_tau=0.001)
+                     actor_lr=actor_lr, q_lr=q_lr, track_tau=track_tau)
     pol = NNPolicy(algorithm.actor)
 
     T = 0
@@ -51,7 +52,8 @@ HYPERPARAMS = {
     'discount': [0.9,0.95],
     'noise_sigma': [0.1,0.2,0.3],
     'actor_lr': [1e-3,1e-4],
-    'q_lr': [1e-3,1e-4]
+    'q_lr': [1e-3,1e-4],
+    'track_tau': [0.01,0.001]
 }
 
 if __name__ == "__main__":

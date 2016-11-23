@@ -27,9 +27,12 @@ def print_stats(itr, pol, env, samples):
     print 'Num sam:', len(samples)
     
     #all_acts = np.concatenate([samp.act for samp in samples])
-    ent = pol_entropy(pol, samples)
-    print 'Avg Entropy:', ent
-    print 'Avg Perplexity:', 2**ent
+    try:
+        ent = pol_entropy(pol, samples)
+        print 'Avg Entropy:', ent
+        print 'Avg Perplexity:', 2**ent
+    except AttributeError:
+        pass
 
 
 #def discount_value(rew, gamma=0.99):

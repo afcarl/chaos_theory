@@ -120,38 +120,25 @@ class ListDataset(Dataset):
 class FIFOBuffer(Dataset):
     """
     Limited capacity, first-in first-out buffer
-
-
     >>> buf = FIFOBuffer(capacity=2)
     >>> buf.append('a').append('b')
     Buffer['a', 'b']
     >>> buf.append('c')
-    Buffer['b', 'c']
-    >>> buf._buffer
-    ['a', 'b', 'c']
+    Buffer['c', 'b']
     >>> buf.append('d').append('e')
-    Buffer['d', 'e']
-    >>> buf._buffer
-    ['d', 'e']
+    Buffer['e', 'd']
     """
-    def __init__(self, capacity=100, overflow_factor=2):
+    def __init__(self, capacity=100):
         super(FIFOBuffer, self).__init__()
-        self._buffer = []
-        self.C = capacity
+        self._buffer = [None] * int(capacity)
+        self.C = int(capacity)
         self.active_idx = 0
-        self.O = capacity*overflow_factor
+        self.N = 0
 
     def append(self, datum):
-        self._buffer.append(datum)
-
-        if len(self._buffer) > self.C:
-            self.active_idx += 1
-
-        # Reset data list if overflowing
-        if len(self._buffer) > self.O:
-            self._buffer = self._buffer[-self.C:]
-            self.active_idx = 0
-
+        self._buffer[self.active_idx] = datum
+        self.active_idx = (self.active_idx+1) % self.C
+        self.N = min(self.C, self.N+1)
         return self
 
     def append_all(self, collection):
@@ -160,17 +147,17 @@ class FIFOBuffer(Dataset):
         return self
 
     def __len__(self):
-        return min(self.C, len(self._buffer))
+        return self.N
 
     def __getitem__(self, idx):
-        return self._buffer[self.active_idx+idx]
+        return self._buffer[idx]
 
     def __repr__(self):
-        return 'Buffer'+repr(self._buffer[self.active_idx:])
+        return 'Buffer'+repr(self._buffer[:self.N])
 
     def __str__(self):
-        return 'Buffer'+str(self._buffer[self.active_idx:])
+        return 'Buffer'+str(self._buffer[:self.N])
 
     def as_list(self):
-        return self._buffer[self.active_idx:]
+        return self._buffer[:self.N]
 

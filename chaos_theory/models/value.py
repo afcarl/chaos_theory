@@ -86,7 +86,7 @@ def linear_q_fn(state, action, reuse=False):
 def pointmass_q_star(state, action, reuse=False):
     with tf.variable_scope('q_function', reuse=reuse):
         a1 = linear(state, dout=1, name='state')*0.01
-        a2 = linear(action, dout=1, bias=False, name='act') + 0.1*action
+        a2 = linear(action, dout=1, bias=False, name='act') + 0.2*action
     return a1+a2
 
 
@@ -100,6 +100,6 @@ def relu_q_fn(num_hidden=1, dim_hidden=10):
             sa = tf.concat(1, [sout, action])
             assert_shape(sa, [None, dim_hidden+dU])
             out = tf.nn.relu(linear(sa, dout=dim_hidden, name='sa1'))
-            out = linear(out, dout=1, name='sa2')
+            out = linear(out, dout=1, init_scale=0.01, name='sa2')
         return out
     return inner

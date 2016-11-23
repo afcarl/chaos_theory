@@ -32,6 +32,7 @@ def linear_softmax_policy():
         return dist
     return inner
 
+
 def tanh_deterministic_policy(action_space, act_slack=1.0, dim_hidden=10, num_hidden=0):
     assert isinstance(action_space, Box)
     low = action_space.low
@@ -44,7 +45,7 @@ def tanh_deterministic_policy(action_space, act_slack=1.0, dim_hidden=10, num_hi
         with tf.variable_scope('policy', reuse=reuse):
             for i in range(num_hidden):
                 out = tf.nn.relu(linear(out, dout=dim_hidden, name='layer_%d'%i))
-            out = linear(out, dout=dU)
+            out = linear(out, dout=dU, init_scale=0.01)
             pol = tf.nn.tanh(out)*(diff/2) + mid
         return pol
     return inner

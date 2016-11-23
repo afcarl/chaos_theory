@@ -10,15 +10,15 @@ from chaos_theory.models.value import ValueDataPoint
 from chaos_theory.utils.tf_utils import assert_shape
 from chaos_theory.data import to_dataset
 
-SARSData = namedtuple('DataPoint', ['obs', 'act', 'rew', 'obs_next', 'term_mask'])
+SARSData = namedtuple('SARSData', ['obs', 'act', 'rew', 'obs_next', 'term_mask'])
 
-"""
+
 def compute_sars(traj):
     dataset = []
     for t in range(len(traj)-1):
-        dataset.append(SARSData(traj.obs[t], traj.act[t], traj.rew[t], traj.obs[t+1]))
+        dataset.append(SARSData(traj.obs[t], traj.act[t], traj.rew[t], traj.obs[t+1], 0 if t==len(traj)-2 else 1))
     return to_dataset(dataset)
-"""
+
 
 class CriticQNetwork(TFContext):
     def __init__(self, sess, obs_space, action_space, network_arch, actor, weight_decay=1e-2):

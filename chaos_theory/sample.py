@@ -83,8 +83,10 @@ def online_rollout(env, policy, alg, render=False, max_length=float('inf')):
                 clamps += 1
 
         new_obs, rew, done, info = env.step(a)
+        #print obs, a, '=>', rew, new_obs
         if render:
             env.render()
+
         alg.update(obs, a, rew, new_obs, done)
         obs = new_obs
         obs_list.append(obs)

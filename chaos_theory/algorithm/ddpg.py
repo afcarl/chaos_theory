@@ -1,10 +1,11 @@
 import tensorflow as tf
 
-from chaos_theory.algorithm.algorithm import OnlineAlgorithm
+from chaos_theory.algorithm.algorithm import OnlineAlgorithm, BatchAlgorithm
 
 from chaos_theory.data import FIFOBuffer, BatchSampler
-from chaos_theory.models.ddpg_networks import CriticQNetwork, TargetQNetwork, SARSData, TargetPolicyNetwork
-from chaos_theory.models.exploration import OUStrategy
+from chaos_theory.models.ddpg_networks import CriticQNetwork, TargetQNetwork, SARSData, TargetPolicyNetwork, \
+    compute_sars
+from chaos_theory.models.exploration import OUStrategy, IIDStrategy
 from chaos_theory.models.policy import DeterministicPolicyNetwork
 from chaos_theory.utils.colors import ColorLogger
 
@@ -24,7 +25,7 @@ class DDPG(OnlineAlgorithm):
         self.actor_lr=actor_lr
         self.q_lr=q_lr
         self.track_tau = track_tau
-        self.min_batch_size = 1e3
+        self.min_batch_size = 2e3
 
         self.replay_buffer = FIFOBuffer(capacity=5e5)
         self.batch_sampler = BatchSampler(self.replay_buffer)
@@ -40,8 +41,7 @@ class DDPG(OnlineAlgorithm):
         self.critic_network = CriticQNetwork(sess, obs_space, action_space, q_network, self.actor, weight_decay=weight_decay)
         self.target_network = TargetQNetwork(sess, obs_space, action_space, q_network, self.target_actor, self.critic_network)
 
-        self.target_network.copy_critic()
-        #self.target_actor.copy_actor()
+        self.target_network.track(1.0)
         self.target_actor.track(1.0)
 
 
@@ -49,18 +49,62 @@ class DDPG(OnlineAlgorithm):
         # Add data to buffer
         self.replay_buffer.append(SARSData(s,a,r*self.scale_rew,sn, 0 if done else 1))
         if len(self.replay_buffer) < self.min_batch_size:
+            #self.replay_buffer.append(SARSData(s,a,r*self.scale_rew,sn, 0 if done else 1))  # DEBUG
             return
 
         # Fit q-function and policy
-        for batch in self.batch_sampler.with_replacement(batch_size=64, max_itr=1):
+        for batch in BatchSampler(self.replay_buffer).with_replacement(batch_size=32, max_itr=1):
             batch = self.target_network.compute_returns(batch, discount=self.discount)
-            #print 'RETURNS:', batch.stack.returns[:5]
 
             self.critic_network.train_step(batch, lr=self.q_lr)
             self.critic_network.update_policy(batch, lr=self.actor_lr)
 
-        # Track critic & policy
-        self.target_network.track(self.track_tau)
-        self.target_actor.track(self.track_tau)
+            # Track critic & policy
+            self.target_network.track(self.track_tau)
+            self.target_actor.track(self.track_tau)
 
 
+class BatchDDPG(BatchAlgorithm):
+    def __init__(self, obs_space, action_space, q_network, pol_network, noise_sigma=0.2, weight_decay=1e-2):
+        super(BatchDDPG, self).__init__()
+        self.q_network = q_network
+        self.obs_space = obs_space
+        self.action_space = action_space
+
+        self.replay_buffer = FIFOBuffer(capacity=1e6)
+        self.batch_sampler = BatchSampler(self.replay_buffer)
+
+        # Actor
+        self.actor = DeterministicPolicyNetwork(action_space, obs_space, pol_network,
+                                                exploration=OUStrategy(action_space, sigma=noise_sigma))
+        self.sess = sess = self.actor.sess
+        self.target_actor = TargetPolicyNetwork(self.actor, pol_network,
+                                                sess=sess)
+
+        # Construct Q-networks
+        self.critic_network = CriticQNetwork(sess, obs_space, action_space, q_network, self.actor, weight_decay=weight_decay)
+        self.target_network = TargetQNetwork(sess, obs_space, action_space, q_network, self.target_actor, self.critic_network)
+
+        self.target_network.track(1.0)
+        self.target_actor.track(1.0)
+
+
+    def update(self, samples, **args):
+        # Turn trajectories into (s, a, r) tuples
+        LOGGER.debug('Adding to replay buffer')
+        for traj in samples:
+            self.replay_buffer.append_all(compute_sars(traj))
+
+        # Fit q-function
+        LOGGER.debug('Fitting Q-function and updating policy')
+        for batch in self.batch_sampler.with_replacement(batch_size=10, max_itr=100):
+            batch = self.target_network.compute_returns(batch)
+            self.critic_network.train_step(batch, lr=1e-3)
+
+            # Update actor
+            self.critic_network.update_policy(batch, lr=1e-3)
+
+        # Track
+        self.target_network.track(1.0)
+        self.target_actor.track(1.0)
+        return float('NaN')

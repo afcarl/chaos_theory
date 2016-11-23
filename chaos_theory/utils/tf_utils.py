@@ -12,9 +12,9 @@ from chaos_theory.utils.config import FLOAT_X
 LOGGER = logging.getLogger(__name__)
 
 
-def linear(input, dout=None, bias=True, name=''):
+def linear(input, dout=None, bias=True, init_scale=1.0, name=''):
     _, din = input.get_shape()
-    init = 1.0/np.sqrt(int(din))
+    init = init_scale/np.sqrt(int(din))
     Winit = np.random.uniform(low=-init, high=init, size=(din, dout)).astype(np.float32)
     W = tf.get_variable('W'+name, initializer=tf.constant(Winit))
 
