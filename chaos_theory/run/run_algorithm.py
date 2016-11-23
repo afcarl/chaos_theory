@@ -7,11 +7,12 @@ except ImportError:
 
 
 from chaos_theory.run.sample import online_rollout, rollout, sample_seq
-from chaos_theory.utils import print_stats, TBLogger
+from chaos_theory.utils import print_stats, TBLogger, mkdir_p
 from chaos_theory.utils.progressbar import progress_itr
 
 
 def make_gif(expr_name, itr, images, fps=40):
+    mkdir_p(os.path.join(expr_name, 'gifs'))
     imageio.mimwrite(os.path.join(expr_name, 'gifs', 'itr_%d.gif' % itr),
                      images, fps=fps)
 
