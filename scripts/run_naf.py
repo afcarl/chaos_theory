@@ -14,4 +14,4 @@ if __name__ == "__main__":
     env = gym.make('InvertedPendulum-v1')
     algorithm = NAF(env)
     run_online_algorithm(env, algorithm, alg_itrs=10000, samples_per_update=5,
-                         verbose_trial=10, max_length=100)
+                         verbose_trial=-1, max_length=100)

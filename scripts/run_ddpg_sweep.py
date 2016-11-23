@@ -6,7 +6,7 @@ from chaos_theory.run.run_algorithm import run_online_algorithm
 from chaos_theory.utils.hyper_sweep import run_sweep
 
 
-def run(env='InvertedPendulum-v1', verbose_trial=False, max_iter=100,
+def run(env='HalfCheetah-v1', verbose_trial=False, max_iter=100,
         track_tau=0.001,
         discount=0.9, noise_sigma=0.2, actor_lr=1e-4, q_lr=1e-3, hyperparam_string=''):
     tf.reset_default_graph()
@@ -19,8 +19,8 @@ def run(env='InvertedPendulum-v1', verbose_trial=False, max_iter=100,
                      discount=discount, noise_sigma=noise_sigma,
                      actor_lr=actor_lr, q_lr=q_lr, track_tau=track_tau)
 
-    run_online_algorithm(env, algorithm, alg_itrs=max_iter, samples_per_update=5,
-                         max_length=200)
+    run_online_algorithm(env, algorithm, alg_itrs=max_iter, samples_per_update=1,
+                         max_length=1000, log_name='ddpg_'+hyperparam_string)
 
 
 HYPERPARAMS = {

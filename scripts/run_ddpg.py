@@ -16,8 +16,8 @@ if __name__ == "__main__":
     q_network = two_layer_q()
 
     algorithm = DDPG(env, q_network, policy_arch, discount=0.9,
-                     noise_sigma=0.2, track_tau=0.01,
+                     noise_sigma=0.2, track_tau=0.001,
                      actor_lr=1e-4, q_lr=1e-3, weight_decay=1e-2)
 
     run_online_algorithm(env, algorithm, alg_itrs=10000, samples_per_update=5,
-                         verbose_trial=10, max_length=100)
+                         verbose_trial=-1, max_length=100)

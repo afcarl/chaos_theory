@@ -63,7 +63,8 @@ def rollout(env, policy, render=True, max_length=float('inf')):
     obs_list.pop(-1)
 
     if clamps > 0.2 * t:
-        print 'WARNING: Lots of clamps:', clamps
+        #print 'WARNING: Lots of clamps:', clamps
+        pass
 
     traj = Trajectory(obs_list, act_list, rew_list, info_list)
     return traj
@@ -115,7 +116,8 @@ def online_rollout(env, policy, alg, render=False, max_length=float('inf')):
             break
 
     if clamps > 0.2 * t:
-        print 'WARNING: Lots of clamps:', clamps
+        #print 'WARNING: Lots of clamps:', clamps
+        pass
 
     traj = Trajectory(obs_list, act_list, rew_list, info_list)
     return traj

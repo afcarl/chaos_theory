@@ -4,8 +4,6 @@ import logging
 
 from gym.spaces import Box
 
-from chaos_theory.algorithm.reinforce import ReinforceGrad
-from chaos_theory.data import ListDataset
 from chaos_theory.distribution.categorical import SoftmaxDistribution
 from chaos_theory.models.tf_network import TFNet
 from chaos_theory.utils import linear, assert_shape
@@ -131,6 +129,9 @@ class StochasticPolicyNetwork(TFNet):
         obs = np.expand_dims(obs, axis=0)
         pol_params = self.run(self.pol_dist.params, {self.obs: obs})
         return self.pol_dist.sample(1, pol_params)[0]
+
+    def reset(self):
+        pass
 
     def sample_act(self, obs):
         act = self.__sample_act(obs)
