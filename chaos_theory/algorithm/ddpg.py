@@ -6,20 +6,20 @@ from chaos_theory.data import FIFOBuffer, BatchSampler
 from chaos_theory.models.ddpg_networks import CriticQNetwork, TargetQNetwork, SARSData, TargetPolicyNetwork, \
     compute_sars
 from chaos_theory.models.exploration import OUStrategy, IIDStrategy
-from chaos_theory.models.policy import DeterministicPolicyNetwork
+from chaos_theory.models.policy import DeterministicPolicyNetwork, NNPolicy
 from chaos_theory.utils.colors import ColorLogger
 
 LOGGER = ColorLogger(__name__)
 
 
 class DDPG(OnlineAlgorithm):
-    def __init__(self, obs_space, action_space, q_network, pol_network,
+    def __init__(self, env, q_network, pol_network,
                  discount=0.99, noise_sigma=0.1, scale_rew=1.0,
                  actor_lr=1e-4, q_lr=1e-3, track_tau=0.001, weight_decay=1e-2):
         super(DDPG, self).__init__()
         self.q_network = q_network
-        self.obs_space = obs_space
-        self.action_space = action_space
+        self.obs_space = obs_space = env.observation_space
+        self.action_space = action_space = env.action_space
         self.discount = discount
         self.scale_rew = scale_rew
         self.actor_lr=actor_lr
@@ -63,6 +63,8 @@ class DDPG(OnlineAlgorithm):
             self.target_network.track(self.track_tau)
             self.target_actor.track(self.track_tau)
 
+    def get_policy(self):
+        return NNPolicy(self.actor)
 
 class BatchDDPG(BatchAlgorithm):
     def __init__(self, obs_space, action_space, q_network, pol_network, noise_sigma=0.2, weight_decay=1e-2):
@@ -88,6 +90,8 @@ class BatchDDPG(BatchAlgorithm):
         self.target_network.track(1.0)
         self.target_actor.track(1.0)
 
+    def get_policy(self):
+        return NNPolicy(self.actor)
 
     def update(self, samples, **args):
         # Turn trajectories into (s, a, r) tuples

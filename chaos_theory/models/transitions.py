@@ -1,3 +1,0 @@
-
-class NNet(object):
-    pass

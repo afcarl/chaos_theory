@@ -1,3 +1,7 @@
+"""
+Exploration strategies
+"""
+
 from gym.spaces import Box
 import numpy as np
 import numpy.random as nr

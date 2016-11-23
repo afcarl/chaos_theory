@@ -1,2 +1,4 @@
 joblib
 gym
+numpy
+tensorflow

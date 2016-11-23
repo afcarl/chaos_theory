@@ -7,8 +7,10 @@ from chaos_theory.utils.config import FLOAT_X
 
 
 class Trajectory(object):
-    """docstring for Trajectory"""
-
+    """
+    Holds one episode's (s, a, r) tuples in sequential order.
+    For batch algorithms.
+    """
     def __init__(self, obs, act, rew, info, discount=1.0):
         super(Trajectory, self).__init__()
         self.obs = np.array(obs).astype(np.float)
@@ -30,6 +32,7 @@ class Trajectory(object):
 
     @property
     def returns(self):
+        """ Returns discounted returns """
         return self.disc_rew
 
     @property
@@ -44,6 +47,9 @@ def to_dataset(l):
 
 
 class Dataset(object):
+    """
+    List-like object for managing lists of data.
+    """
     __metaclass__ = ABCMeta
 
     def __init__(self):
@@ -63,6 +69,16 @@ class Dataset(object):
 
     @property
     def stack(self):
+        """
+        Returns a function that stacks all elements of a particular attribute.
+
+        Ex.
+        dataset.stack.attr1
+
+        Outputs:
+        np.array([ data[0].attr1, data[1].attr1, ... ])
+
+        """
         data_list = self.as_list()
         class Dispatch(object):
             def __init__(self):
@@ -74,6 +90,16 @@ class Dataset(object):
 
     @property
     def concat(self):
+        """
+        Returns a function that all elements of a particular attribute.
+
+        Ex.
+        dataset.concat.attr1
+
+        Outputs:
+        np.concatenate([ data[0].attr1, data[1].attr1, ... ])
+
+        """
         data_list = self.as_list()
 
         class Dispatch(object):
@@ -120,6 +146,7 @@ class ListDataset(Dataset):
 class FIFOBuffer(Dataset):
     """
     Limited capacity, first-in first-out buffer
+
     >>> buf = FIFOBuffer(capacity=2)
     >>> buf.append('a').append('b')
     Buffer['a', 'b']

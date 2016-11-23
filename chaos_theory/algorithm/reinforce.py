@@ -3,17 +3,23 @@ import tensorflow as tf
 from chaos_theory.algorithm.algorithm import BatchAlgorithm
 from chaos_theory.data import ListDataset
 from chaos_theory.models.advantage import Advantage
+from chaos_theory.models.policy import StochasticPolicyNetwork
 from chaos_theory.utils import assert_shape
 
 
 class ReinforceGrad(BatchAlgorithm):
-    def __init__(self, normalize_rewards=True, advantage=Advantage(), pol_network=None):
+    def __init__(self, env, discount=0.95,
+                 normalize_rewards=True, advantage=Advantage(), pol_network=None,
+                 lr=5-3):
         super(ReinforceGrad, self).__init__()
         self.advantage = advantage
         self.normalize_rewards = normalize_rewards
-        self.policy_net = pol_network
-        self.dO = pol_network.dO
-        self.dU = pol_network.dU
+        policy = StochasticPolicyNetwork(env.action_space, env.observation_space,
+                                            policy_network=pol_network)
+        self.policy_net = policy
+        self.dO = policy.dO
+        self.dU = policy.dU
+        self.discount = discount
         self.__compute_surr()
 
     def surr_loss(self, obs_tensor, act_tensor, returns_tensor, batch_size, pol_network):
@@ -51,7 +57,7 @@ class ReinforceGrad(BatchAlgorithm):
         self.sess.run(tf.initialize_all_variables())
 
     def update(self, samples, **args):
-        lr = args.get('lr', 5e-3)
+        [samp.apply_discount(self.discount) for samp in samples]
 
         # Compute advantage function
         self.advantage.update(samples)
@@ -65,3 +71,6 @@ class ReinforceGrad(BatchAlgorithm):
                                                           self.batch_size: len(batch),
                                                           self.returns_surr: batch.concat.returns})
         return loss
+
+    def get_policy(self):
+        return NNPolicy()

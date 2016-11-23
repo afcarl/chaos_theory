@@ -18,6 +18,14 @@ def clamp_actions(space, a):
     return a
 
 def rollout(env, policy, render=True, max_length=float('inf')):
+    """
+    Run a policy (rollout for batch-style algorithms)
+    :param env:
+    :param policy:
+    :param render:
+    :param max_length:
+    :return:
+    """
     obs = env.reset()
     done = False
     obs_list = [obs]  #TODO: This is a bug? But for some reason works much better
@@ -62,9 +70,18 @@ def rollout(env, policy, render=True, max_length=float('inf')):
 
 
 def online_rollout(env, policy, alg, render=False, max_length=float('inf')):
+    """
+    Rollout for online algorithms
+    :param env:
+    :param policy:
+    :param alg:
+    :param render:
+    :param max_length:
+    :return:
+    """
     obs = env.reset()
     done = False
-    obs_list = [obs]  #TODO: This is a bug? But for some reason works much better
+    obs_list = []
     rew_list = []
     act_list = []
     info_list = []
@@ -88,15 +105,14 @@ def online_rollout(env, policy, alg, render=False, max_length=float('inf')):
             env.render()
 
         alg.update(obs, a, rew, new_obs, done)
-        obs = new_obs
         obs_list.append(obs)
         act_list.append(a_raw)
         rew_list.append(rew)
         info_list.append(info)
+        obs = new_obs
         t += 1
         if t >= max_length:
             break
-    obs_list.pop(-1)
 
     if clamps > 0.2 * t:
         print 'WARNING: Lots of clamps:', clamps
@@ -154,11 +170,12 @@ def sample_par(env, pol, n=1, max_length=1000):
     print 'done'
     return res
 
-def sample(env, policy, max_samples=float('inf'), max_length=float('inf')):
+def sample_seq(env, policy, max_samples=float('inf'), max_length=float('inf')):
     tot_len = 0
     samples = []
     #while tot_len < max_length:
     for _ in progress_itr(range(max_samples)):
+        policy.reset()
         traj = rollout(env, policy, render=False, max_length=max_length)
         tot_len += len(traj)
         samples.append(traj)

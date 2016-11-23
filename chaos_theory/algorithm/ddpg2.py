@@ -1,3 +1,8 @@
+"""
+Second DDPG implementation, based on ICNN code (https://github.com/locuslab/icnn)
+
+Slightly faster, due to returns being calculated within the TF graph.
+"""
 import numpy as np
 import tensorflow as tf
 
@@ -132,6 +137,9 @@ class DDPG2(OnlineAlgorithm):
         action = self.exploration.add_noise(act)
         self.action = np.atleast_1d(np.squeeze(action, axis=0))  # TODO: remove this hack
         return self.action
+
+    def get_policy(self):
+        return self
 
     def __del__(self):
         self.sess.close()
