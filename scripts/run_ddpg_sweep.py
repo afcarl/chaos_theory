@@ -1,7 +1,8 @@
 import gym
 import tensorflow as tf
 
-from chaos_theory.algorithm import DDPG, two_layer_policy, two_layer_q
+from chaos_theory.algorithm import DDPG
+from chaos_theory.models.network_defs import two_layer_policy, two_layer_q
 from chaos_theory.run.run_algorithm import run_online_algorithm
 from chaos_theory.utils.hyper_sweep import run_sweep
 
@@ -16,8 +17,8 @@ def run(env='HalfCheetah-v1', verbose_trial=False, max_iter=100,
     q_network = two_layer_q()
 
     algorithm = DDPG(env, q_network, policy_arch,
-                     discount=discount, noise_sigma=noise_sigma,
-                     actor_lr=actor_lr, q_lr=q_lr, track_tau=track_tau)
+                        discount=discount, noise_sigma=noise_sigma,
+                        actor_lr=actor_lr, q_lr=q_lr, track_tau=track_tau)
 
     run_online_algorithm(env, algorithm, alg_itrs=max_iter, samples_per_update=1,
                          max_length=1000, log_name='ddpg_'+hyperparam_string)

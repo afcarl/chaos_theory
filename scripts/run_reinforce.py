@@ -5,7 +5,7 @@ import gym.spaces
 import numpy as np
 
 from chaos_theory.algorithm.reinforce import ReinforceGrad
-from chaos_theory.models.policy import relu_gaussian_policy, linear_softmax_policy
+from chaos_theory.models.network_defs import linear_softmax_policy, relu_gaussian_policy
 from chaos_theory.run.run_algorithm import run_batch_algorithm
 
 logging.basicConfig(level=logging.DEBUG)

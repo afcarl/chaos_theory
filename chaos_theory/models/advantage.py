@@ -3,7 +3,8 @@ import numpy as np
 import logging
 
 from chaos_theory.data import FIFOBuffer, ListDataset
-from chaos_theory.models.value import ValueNetwork, linear_value_fn, create_value_datapoints
+from chaos_theory.models.value import ValueNetwork, create_value_datapoints
+from chaos_theory.models.network_defs import linear_value_fn
 from chaos_theory.utils import assert_shape
 
 LOGGER = logging.getLogger(__name__)

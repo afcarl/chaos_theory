@@ -5,8 +5,6 @@ from collections import namedtuple
 
 import tensorflow as tf
 
-from chaos_theory.utils import assert_shape
-from chaos_theory.utils import linear
 from .tf_network import TFNet
 
 
@@ -71,35 +69,3 @@ class QNetwork(TFNet):
                                                      self.action: batch.stack.act,
                                                      self.q_labels: batch.stack.returns})[0]
 
-def linear_value_fn(state):
-    value = linear(state, dout=1)
-    return value
-
-
-def linear_q_fn(state, action, reuse=False):
-    with tf.variable_scope('q_function', reuse=reuse):
-        a1 = linear(state, dout=1, name='state')
-        a2 = linear(action, dout=1, name='act')
-    return a1+a2
-
-
-def pointmass_q_star(state, action, reuse=False):
-    with tf.variable_scope('q_function', reuse=reuse):
-        a1 = linear(state, dout=1, name='state')*0.01
-        a2 = linear(action, dout=1, bias=False, name='act') + 0.2*action
-    return a1+a2
-
-
-def relu_q_fn(num_hidden=1, dim_hidden=10):
-    def inner(state, action, reuse=False):
-        sout = state
-        dU = int(action.get_shape()[1])
-        with tf.variable_scope('q_function', reuse=reuse) as vs:
-            for i in range(num_hidden):
-                sout = tf.nn.relu(linear(sout, dout=dim_hidden, name='layer_%d'%i))
-            sa = tf.concat(1, [sout, action])
-            assert_shape(sa, [None, dim_hidden+dU])
-            out = tf.nn.relu(linear(sa, dout=dim_hidden, name='sa1'))
-            out = linear(out, dout=1, init_scale=0.01, name='sa2')
-        return out
-    return inner

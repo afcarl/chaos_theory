@@ -1,64 +1,13 @@
-import tensorflow as tf
-import numpy as np
 import logging
 
-from gym.spaces import Box
+import numpy as np
+import tensorflow as tf
 
-from chaos_theory.distribution.categorical import SoftmaxDistribution
+from chaos_theory.models.network_defs import linear_gaussian_policy
 from chaos_theory.models.tf_network import TFNet
-from chaos_theory.utils import linear, assert_shape
-from chaos_theory.distribution import DiagGauss
 from chaos_theory.utils.gym_utils import action_space_dim
 
 LOGGER = logging.getLogger(__name__)
-
-
-def linear_gaussian_policy(min_std=0.1):
-    def inner(obs, dU, reuse=False):
-        dist = DiagGauss(dU, min_var=min_std)
-        with tf.variable_scope('policy', reuse=reuse) as vs:
-            dist.compute_params_tensor(obs)
-        return dist
-    return inner
-
-
-def linear_softmax_policy():
-    def inner(obs, dU, reuse=False):
-        dist = SoftmaxDistribution(dU)
-        with tf.variable_scope('policy', reuse=reuse) as vs:
-            dist.compute_params_tensor(obs)
-        return dist
-    return inner
-
-
-def tanh_deterministic_policy(action_space, act_slack=1.0, dim_hidden=10, num_hidden=0):
-    assert isinstance(action_space, Box)
-    low = action_space.low
-    high = action_space.high
-    mid = (low+high)/2
-    diff = high-low
-    diff *= act_slack
-    def inner(obs, dU, reuse=False):
-        out = obs
-        with tf.variable_scope('policy', reuse=reuse):
-            for i in range(num_hidden):
-                out = tf.nn.relu(linear(out, dout=dim_hidden, name='layer_%d'%i))
-            out = linear(out, dout=dU, init_scale=0.01)
-            pol = tf.nn.tanh(out)*(diff/2) + mid
-        return pol
-    return inner
-
-
-def relu_gaussian_policy(num_hidden=1, dim_hidden=10, min_std=0.0, mean_clamp=None):
-    def inner(obs, dU, reuse=False):
-        out = obs
-        dist = DiagGauss(dU, mean_clamp=mean_clamp, min_var=min_std)
-        with tf.variable_scope('policy', reuse=reuse) as vs:
-            for i in range(num_hidden):
-                out = tf.nn.relu(linear(out, dout=dim_hidden, name='layer_%d'%i))
-            dist.compute_params_tensor(out)
-        return dist
-    return inner
 
 
 class Policy(object):
@@ -108,9 +57,9 @@ class NNPolicy(Policy):
 
 
 class StochasticPolicyNetwork(TFNet):
-    def __init__(self, action_space, obs_space, 
-                policy_network=linear_gaussian_policy(0.01),
-                ):
+    def __init__(self, action_space, obs_space,
+                 policy_network=linear_gaussian_policy(0.01),
+                 ):
         self.dO = obs_space.shape[0]
         self.dU = action_space_dim(action_space)
         super(StochasticPolicyNetwork, self).__init__(policy_network=policy_network,

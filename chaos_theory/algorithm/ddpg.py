@@ -1,114 +1,128 @@
+"""
+Second DDPG implementation, based on ICNN code (https://github.com/locuslab/icnn)
+
+Slightly faster, due to returns being calculated within the TF graph.
+"""
+import numpy as np
 import tensorflow as tf
 
-from chaos_theory.algorithm.algorithm import OnlineAlgorithm, BatchAlgorithm
-
+from chaos_theory.algorithm.algorithm import OnlineAlgorithm
 from chaos_theory.data import FIFOBuffer, BatchSampler
-from chaos_theory.models.ddpg_networks import CriticQNetwork, TargetQNetwork, SARSData, TargetPolicyNetwork, \
-    compute_sars
-from chaos_theory.models.exploration import OUStrategy, IIDStrategy
-from chaos_theory.models.policy import DeterministicPolicyNetwork, NNPolicy
-from chaos_theory.utils.colors import ColorLogger
-
-LOGGER = ColorLogger(__name__)
+from chaos_theory.models.ddpg_networks import SARSData
+from chaos_theory.models.exploration import OUStrategy
+from chaos_theory.models.network_defs import two_layer_policy, two_layer_q
+from chaos_theory.models.policy import Policy
 
 
-class DDPG(OnlineAlgorithm):
-    def __init__(self, env, q_network, pol_network,
-                 discount=0.99, noise_sigma=0.1, scale_rew=1.0,
-                 actor_lr=1e-4, q_lr=1e-3, track_tau=0.001, weight_decay=1e-2):
+class DDPG(OnlineAlgorithm, Policy):
+    def __init__(self, env,
+                 pol_network=two_layer_policy(),
+                 q_network=two_layer_q(),
+                 track_tau=0.001,
+                 discount=0.95,
+                 actor_lr=1e-4,
+                 q_lr=1e-3,
+                 noise_sigma=0.2,
+                 noise_theta=0.15,
+                 rbuffer_size=1e5,
+                 min_buffer_size=1e3,
+                 l2_reg=0,
+                 inner_itrs=1,
+                 batch_size=32
+                 ):
         super(DDPG, self).__init__()
-        self.q_network = q_network
-        self.obs_space = obs_space = env.observation_space
-        self.action_space = action_space = env.action_space
-        self.discount = discount
-        self.scale_rew = scale_rew
-        self.actor_lr=actor_lr
-        self.q_lr=q_lr
-        self.track_tau = track_tau
-        self.min_batch_size = 2e3
+        dO = env.observation_space.shape[0]
+        dU = env.action_space.shape[0]
 
-        self.replay_buffer = FIFOBuffer(capacity=5e5)
-        self.batch_sampler = BatchSampler(self.replay_buffer)
+        self.min_buffer_size = min_buffer_size
+        self.inner_itrs = inner_itrs
+        self.batch_size = batch_size
+        self.buffer = FIFOBuffer(rbuffer_size)
+        self.sess = tf.Session()
 
-        # Actor
-        self.actor = DeterministicPolicyNetwork(action_space, obs_space, pol_network,
-                                                exploration=OUStrategy(action_space, sigma=noise_sigma))
-        self.sess = sess = self.actor.sess
-        self.target_actor = TargetPolicyNetwork(self.actor, pol_network,
-                                                       sess=sess)
+        self.exploration = OUStrategy(env.action_space, theta=noise_theta, sigma=noise_sigma)
+        self.obs = tf.placeholder(tf.float32, [None, dO], "obs")
+        self.act_train = tf.placeholder(tf.float32, [None, dU], "act_train")
+        self.rew = tf.placeholder(tf.float32, [None], "rew")
+        self.obs_next = tf.placeholder(tf.float32, [None, dO], "obs_next")
+        self.done = tf.placeholder(tf.bool, [None], "term2")
 
-        # Construct Q-networks
-        self.critic_network = CriticQNetwork(sess, obs_space, action_space, q_network, self.actor, weight_decay=weight_decay)
-        self.target_network = TargetQNetwork(sess, obs_space, action_space, q_network, self.target_actor, self.critic_network)
+        # Policy loss
+        with tf.variable_scope('pol') as vs:
+            self.act_test = pol_network(self.obs, dU)
+            vs.reuse_variables()
+            act_train_policy = pol_network(self.obs, dU)
+        with tf.variable_scope('critic_q'):
+            q_train_policy = q_network(self.obs, act_train_policy)
+        meanq = tf.reduce_mean(q_train_policy, reduction_indices=0)
+        pol_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='pol')
+        wd_p = tf.add_n([l2_reg * tf.nn.l2_loss(var) for var in pol_vars])  # weight decay
+        loss_p = -meanq + wd_p
+        self.pol_optimize_op = tf.train.AdamOptimizer(learning_rate=actor_lr).minimize(loss_p, var_list=pol_vars)
 
-        self.target_network.track(1.0)
-        self.target_actor.track(1.0)
+        # Q loss
+        with tf.variable_scope('critic_q', reuse=True):
+            q_train = q_network(self.obs, self.act_train)
+        with tf.variable_scope('target_pol'):
+            act2 = pol_network(self.obs_next, dU)
+        with tf.variable_scope('target_q'):
+            q2 = q_network(self.obs_next, act2)
+        q_target = tf.stop_gradient(tf.select(self.done, self.rew, self.rew + discount * q2))
+        td_error = q_train - q_target
+        ms_td_error = tf.reduce_mean(tf.square(td_error), reduction_indices=0)
+        q_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='critic_q')
+        wd_q = tf.add_n([l2_reg * tf.nn.l2_loss(var) for var in q_vars])  # weight decay
+        loss_q = ms_td_error + wd_q
+        self.q_optimize_op = tf.train.AdamOptimizer(learning_rate=q_lr).minimize(loss_q, var_list=q_vars)
 
+        # Tracking OPs
+        self.pol_track_op = make_track_op('target_pol', 'pol', track_tau)
+        self.q_track_op= make_track_op('target_q', 'critic_q', track_tau)
+
+        self.sess.run(tf.initialize_all_variables())
 
     def update(self, s, a, r, sn, done):
-        # Add data to buffer
-        self.replay_buffer.append(SARSData(s,a,r*self.scale_rew,sn, 0 if done else 1))
-        if len(self.replay_buffer) < self.min_batch_size:
-            #self.replay_buffer.append(SARSData(s,a,r*self.scale_rew,sn, 0 if done else 1))  # DEBUG
+        self.buffer.append(SARSData(s,a,r, sn, 0 if done else 1))
+
+        if len(self.buffer) < self.min_buffer_size:
             return
 
-        # Fit q-function and policy
-        for batch in BatchSampler(self.replay_buffer).with_replacement(batch_size=32, max_itr=1):
-            batch = self.target_network.compute_returns(batch, discount=self.discount)
+        for batch in BatchSampler(self.buffer).with_replacement(batch_size=self.batch_size,
+                                                                max_itr=self.inner_itrs):
+            obs, act, rew, ob2, not_done = (batch.stack.obs, batch.stack.act, batch.stack.rew,
+                                         batch.stack.obs_next, batch.stack.term_mask)
+            done = (1.0-not_done).astype(np.bool)
 
-            self.critic_network.train_step(batch, lr=self.q_lr)
-            self.critic_network.update_policy(batch, lr=self.actor_lr)
+            # Optimize policy
+            self.sess.run(self.pol_optimize_op, {self.obs: obs})
+            self.sess.run(self.q_optimize_op, {self.obs: obs, self.act_train: act, self.rew: rew,
+                                               self.obs_next: ob2, self.done: done})
 
-            # Track critic & policy
-            self.target_network.track(self.track_tau)
-            self.target_actor.track(self.track_tau)
+            # Target tracking
+            self.sess.run(self.q_track_op)
+            self.sess.run(self.pol_track_op)
 
-    def get_policy(self):
-        return NNPolicy(self.actor)
+    def reset(self):
+        self.exploration.reset()
 
-class BatchDDPG(BatchAlgorithm):
-    def __init__(self, obs_space, action_space, q_network, pol_network, noise_sigma=0.2, weight_decay=1e-2):
-        super(BatchDDPG, self).__init__()
-        self.q_network = q_network
-        self.obs_space = obs_space
-        self.action_space = action_space
-
-        self.replay_buffer = FIFOBuffer(capacity=1e6)
-        self.batch_sampler = BatchSampler(self.replay_buffer)
-
-        # Actor
-        self.actor = DeterministicPolicyNetwork(action_space, obs_space, pol_network,
-                                                exploration=OUStrategy(action_space, sigma=noise_sigma))
-        self.sess = sess = self.actor.sess
-        self.target_actor = TargetPolicyNetwork(self.actor, pol_network,
-                                                sess=sess)
-
-        # Construct Q-networks
-        self.critic_network = CriticQNetwork(sess, obs_space, action_space, q_network, self.actor, weight_decay=weight_decay)
-        self.target_network = TargetQNetwork(sess, obs_space, action_space, q_network, self.target_actor, self.critic_network)
-
-        self.target_network.track(1.0)
-        self.target_actor.track(1.0)
+    def act(self, obs):
+        obs = np.expand_dims(obs, axis=0)
+        act = self.sess.run(self.act_test, feed_dict={self.obs: obs})
+        action = self.exploration.add_noise(act)
+        self.action = np.atleast_1d(np.squeeze(action, axis=0))
+        return self.action
 
     def get_policy(self):
-        return NNPolicy(self.actor)
+        return self
 
-    def update(self, samples, **args):
-        # Turn trajectories into (s, a, r) tuples
-        LOGGER.debug('Adding to replay buffer')
-        for traj in samples:
-            self.replay_buffer.append_all(compute_sars(traj))
+    def __del__(self):
+        self.sess.close()
 
-        # Fit q-function
-        LOGGER.debug('Fitting Q-function and updating policy')
-        for batch in self.batch_sampler.with_replacement(batch_size=10, max_itr=100):
-            batch = self.target_network.compute_returns(batch)
-            self.critic_network.train_step(batch, lr=1e-3)
 
-            # Update actor
-            self.critic_network.update_policy(batch, lr=1e-3)
+def make_track_op(scope1, scope2, track_rate):
+    vars1 = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope1)
+    vars2 = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope2)
+    track_ops = [tf.assign(vars1[i], (1-track_rate)*vars1[i] + (track_rate)*vars2[i]) for i in range(len(vars1))]
+    return track_ops
 
-        # Track
-        self.target_network.track(1.0)
-        self.target_actor.track(1.0)
-        return float('NaN')
+
