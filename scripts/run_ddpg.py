@@ -11,6 +11,7 @@ logging.getLogger().setLevel(logging.DEBUG)
 np.random.seed(1)
 
 if __name__ == "__main__":
-    env = gym.make('HalfCheetah-v1')
-    algorithm = DDPG(env, track_tau=0.001, discount=0.9)
-    run_online_algorithm(env, algorithm, max_length=500, verbose_trial=10)
+    env_name = 'HalfCheetah-v1'
+    env = gym.make(env_name)
+    algorithm = DDPG(env, track_tau=0.001, discount=0.95)
+    run_online_algorithm(env, algorithm, max_length=1000, samples_per_update=1, verbose_trial=5, log_name='ddpg_'+env_name)

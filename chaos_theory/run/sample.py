@@ -53,7 +53,8 @@ def rollout(env, policy, render=True, max_length=float('inf')):
 
         obs, rew, done, info = env.step(a)
         if render:
-            images.append(env.render())
+            image = env.render(mode='rgb_array')
+            images.append(image)
 
         #print obs
         obs_list.append(obs)

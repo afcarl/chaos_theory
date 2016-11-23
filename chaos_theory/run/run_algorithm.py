@@ -12,8 +12,9 @@ from chaos_theory.utils.progressbar import progress_itr
 
 
 def make_gif(expr_name, itr, images, fps=40):
-    mkdir_p(os.path.join(expr_name, 'gifs'))
-    imageio.mimwrite(os.path.join(expr_name, 'gifs', 'itr_%d.gif' % itr),
+    gif_dir = os.path.join('logdir', expr_name, 'gifs')
+    mkdir_p(gif_dir)
+    imageio.mimwrite(os.path.join(gif_dir, 'itr_%d.gif' % itr),
                      images, fps=fps)
 
 
