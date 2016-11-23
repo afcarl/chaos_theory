@@ -1,4 +1,5 @@
 from chaos_theory.algorithm.ddpg import DDPG
+from chaos_theory.algorithm.ddpg2 import two_layer_policy, two_layer_q
 from chaos_theory.models.policy import tanh_deterministic_policy, NNPolicy
 from chaos_theory.models.value import linear_q_fn, relu_q_fn, pointmass_q_star
 from chaos_theory.sample import sample, rollout, online_rollout
@@ -21,11 +22,12 @@ ENV = 'InvertedPendulum-v1'
 
 MAX_LENGTH = 100
 
+
 def main():
     """docstring for main"""
     env = gym.make(ENV)
-    policy_arch = tanh_deterministic_policy(env.action_space, dim_hidden=100, num_hidden=2)
-    q_network = relu_q_fn(num_hidden=2, dim_hidden=100)
+    policy_arch = two_layer_policy()#tanh_deterministic_policy(env.action_space, dim_hidden=100, num_hidden=2)
+    q_network = two_layer_q()#relu_q_fn(num_hidden=2, dim_hidden=100)
     #q_network = pointmass_q_star
     #q_network = linear_q_fn
 

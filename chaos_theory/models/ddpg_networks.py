@@ -40,9 +40,9 @@ class CriticQNetwork(TFContext):
             assert_shape(self.obs, [None, dO])
             assert_shape(self.action, [None, dU])
             self.q_pol = network_arch(self.obs, self.action)
-            assert_shape(self.q_pol, [None, 1])
+            assert_shape(self.q_pol, [None])
             self.q_avg = tf.reduce_mean(self.q_pol, reduction_indices=[0])
-            assert_shape(self.q_avg, [1])
+            assert_shape(self.q_avg, [])
             self.actor_op = tf.train.AdamOptimizer(self.lr).minimize(-self.q_avg, var_list=self.actor.trainable_vars)
 
             # Supervised action
@@ -88,7 +88,7 @@ class TargetQNetwork(TFContext):
             self.obs = self.actor.obs_tensor
             self.action = self.actor.action_tensor
             self.q_pred = network_arch(self.obs, self.action)
-            assert_shape(self.q_pred, [None, 1])
+            assert_shape(self.q_pred, [None])
 
             self.track_rate = tf.placeholder(tf.float32, name='track_rate')
             self.trainable_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=vs.name)
@@ -102,7 +102,7 @@ class TargetQNetwork(TFContext):
 
     def compute_returns(self, batch, discount=1.0):
         returns = self.run(self.q_pred, {self.obs: batch.stack.obs_next})
-        returns = (returns[:,0]*discount)*batch.stack.term_mask + batch.stack.rew
+        returns = (returns*discount)*batch.stack.term_mask + batch.stack.rew
 
         data = []
         for i in range(len(batch)):
