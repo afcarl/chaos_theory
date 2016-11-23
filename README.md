@@ -22,6 +22,9 @@ Requirements
 Instructions
 ============
 
+<img src="https://github.com/justinjfu/resources/blob/master/rl_site/cheetah_ddpg.gif" width="250">
+<img src="https://github.com/justinjfu/resources/blob/master/rl_site/cartpole_reinf.gif" width="250">
+
 REINFORCE Cartpole experiment:
 ```
 python scripts/run_reinforce.py
@@ -31,4 +34,4 @@ DDPG Half-Cheetah experiment:
 ```
 python scripts/run_ddpg2.py
 ````
-<img src="https://github.com/justinjfu/resources/blob/master/rl_site/cheetah_ddpg.gif" width="300">
+
