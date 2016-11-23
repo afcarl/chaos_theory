@@ -25,6 +25,8 @@ def rollout(env, policy, render=True, max_length=float('inf')):
     :param render:
     :param max_length:
     :return:
+        Trajectory, Images (if render=True)
+        Trajectori (if render=False)
     """
     obs = env.reset()
     done = False
@@ -34,6 +36,8 @@ def rollout(env, policy, render=True, max_length=float('inf')):
     info_list = []
     t = 0
     clamps = 0
+
+    images = []
 
     while not done:
         a_raw = a = policy.act(obs)
@@ -49,7 +53,7 @@ def rollout(env, policy, render=True, max_length=float('inf')):
 
         obs, rew, done, info = env.step(a)
         if render:
-            env.render()
+            images.append(env.render())
 
         #print obs
         obs_list.append(obs)
@@ -67,10 +71,13 @@ def rollout(env, policy, render=True, max_length=float('inf')):
         pass
 
     traj = Trajectory(obs_list, act_list, rew_list, info_list)
-    return traj
+    if render:
+        return traj, np.array(images)
+    else:
+        return traj
 
 
-def online_rollout(env, policy, alg, render=False, max_length=float('inf')):
+def online_rollout(env, policy, alg, max_length=float('inf')):
     """
     Rollout for online algorithms
     :param env:
@@ -101,9 +108,6 @@ def online_rollout(env, policy, alg, render=False, max_length=float('inf')):
                 clamps += 1
 
         new_obs, rew, done, info = env.step(a)
-        #print obs, a, '=>', rew, new_obs
-        if render:
-            env.render()
 
         alg.update(obs, a, rew, new_obs, done)
         obs_list.append(obs)

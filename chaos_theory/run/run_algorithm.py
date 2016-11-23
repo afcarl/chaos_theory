@@ -1,6 +1,19 @@
+import os
+try:
+    import imageio
+except ImportError:
+    print 'ImageIO not found - saving raw arrays for images instead'
+    import imageio_proxy as imageio
+
+
 from chaos_theory.run.sample import online_rollout, rollout, sample_seq
 from chaos_theory.utils import print_stats, TBLogger
 from chaos_theory.utils.progressbar import progress_itr
+
+
+def make_gif(expr_name, itr, images, fps=40):
+    imageio.mimwrite(os.path.join(expr_name, 'gifs', 'itr_%d.gif' % itr),
+                     images, fps=fps)
 
 
 def run_batch_algorithm(env, algorithm, max_length=500, alg_itrs=10000, samples_per_itr=10,
@@ -24,7 +37,9 @@ def run_batch_algorithm(env, algorithm, max_length=500, alg_itrs=10000, samples_
         print_stats(itr, pol, env, samps)
         if verbose_trial > 0:
             if itr % verbose_trial == 0 and itr > 0:
-                rollout(env, pol, max_length=max_length)
+                traj, images = rollout(env, pol, max_length=max_length)
+                if log_name:
+                    make_gif(log_name, itr, images)
 
 
 def run_online_algorithm(env, algorithm, samples_per_update=5, alg_itrs=10000,
@@ -53,4 +68,6 @@ def run_online_algorithm(env, algorithm, samples_per_update=5, alg_itrs=10000,
         print_stats(itr, pol, env, samples)
         if verbose_trial > 0:
             if itr % verbose_trial == 0 and itr > 0:
-                rollout(env, pol, max_length=max_length)
+                traj, images = rollout(env, pol, max_length=max_length)
+                if log_name:
+                    make_gif(log_name, itr, images)
