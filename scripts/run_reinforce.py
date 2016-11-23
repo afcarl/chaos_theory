@@ -23,5 +23,5 @@ if __name__ == "__main__":
     # baseline = LinearBaseline(env.observation_space)
     algorithm = ReinforceGrad(env, discount=0.9, pol_network=policy_arch, lr=5e-3)
 
-    run_batch_algorithm(env, algorithm, samples_per_itr=10, alg_itrs=10000, verbose_trial=5,
-                        max_length=100)
+    run_batch_algorithm(env, algorithm, samples_per_itr=20, alg_itrs=10000, verbose_trial=30,
+                        max_length=200, log_name='reinforce_pend')

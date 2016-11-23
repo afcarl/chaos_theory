@@ -18,6 +18,9 @@ Requirements
 - Tensorflow (https://github.com/tensorflow/tensorflow)
 - Numpy/Scipy
 
+Optional Libraries
+------------
+- imageio (for recording gifs)
 
 Instructions
 ============
