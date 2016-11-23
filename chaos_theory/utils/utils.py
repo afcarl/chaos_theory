@@ -17,15 +17,18 @@ def pol_entropy(pol, samples):
 
 def print_stats(itr, pol, env, samples):
     N = len(samples)
+    print 'Num sam:', N
+
     R = np.array([samp.tot_rew for samp in samples])
     print 'Avg Rew:', np.mean(R), '+/-', np.sqrt(np.var(R))
+    print 'Max Rew:', np.max(R)
 
     T = np.array([samp.T for samp in samples]).astype(np.float)
     avg_len = np.mean(T)
     stdev = np.sqrt(np.var(T))
     print 'Avg Len:', avg_len, '+/-', stdev
-    print 'Num sam:', len(samples)
-    
+    print 'Max Len:', np.max(T)
+
     #all_acts = np.concatenate([samp.act for samp in samples])
     try:
         ent = pol_entropy(pol, samples)

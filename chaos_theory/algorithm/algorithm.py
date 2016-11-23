@@ -6,7 +6,7 @@ class BatchAlgorithm(object):
     def get_policy(self):
         raise NotImplementedError()
 
-    def update(self, samples, *args, **kwargs):
+    def update(self, samples):
         raise NotImplementedError()
 
 

@@ -19,6 +19,9 @@ class Policy(object):
         raise NotImplementedError()
 
     def reset(self):
+        """
+        Called once before each episode
+        """
         pass
 
 
