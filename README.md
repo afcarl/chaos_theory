@@ -31,3 +31,4 @@ DDPG Half-Cheetah experiment:
 ```
 python scripts/run_ddpg2.py
 ````
+<img src="https://github.com/justinjfu/resources/blob/master/rl_site/cheetah_ddpg.gif" width="300">
