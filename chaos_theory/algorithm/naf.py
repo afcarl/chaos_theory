@@ -5,35 +5,19 @@ import numpy as np
 import tensorflow as tf
 
 from chaos_theory.algorithm.algorithm import OnlineAlgorithm
+from chaos_theory.data import BatchSampler, FIFOBuffer
+from chaos_theory.models.ddpg_networks import SARSData
+from chaos_theory.models.exploration import OUStrategy
 from chaos_theory.models.policy import Policy
 
 
 class NAF(OnlineAlgorithm, Policy):
-    def __init__(self, env):
+    def __init__(self, env, tau=0.001, discount=0.95,
+                 outheta=0.15, ousigma=0.2, lr=1e-3, l2reg=1e-3,
+                 min_replay_size=1e3, rbuffer_size=1e5, batch_size=32):
         super(NAF, self).__init__()
         dimO = env.observation_space.shape
         dimA = env.observation_space.shape
-        self.agent = Agent(dimO, dimA)
-
-        self.init = False
-
-    def get_policy(self):
-        return self
-
-    def act(self, obs):
-        if not self.init:
-            self.agent.reset(obs)
-            self.init = True
-        return self.agent.act()
-
-    def update(self, s, a, r, sn, done):
-        self.agent.observe(r, done, sn)
-
-
-class Agent(object):
-    def __init__(self, dimO, dimA, tau=0.001, discount=0.95,
-                 outheta=0.15, ousigma=0.2, lr=1e-3, l2reg=1e-3,
-                 min_replay_size=1e3, replay_size=1e5, batch_size=32):
         dimA = list(dimA)
         dimO = list(dimO)
 
@@ -41,13 +25,12 @@ class Agent(object):
         l2size = 200
 
         self.batch_size = batch_size
-        self.min_replay_size = min_replay_size
-        # init replay memory
-        self.rm = ReplayMemory(replay_size, dimO, dimA)
-        # start tf session
+        self.min_buffer_size = min_replay_size
+        self.exploration = OUStrategy(env.action_space, theta=outheta, sigma=ousigma)
+        self.buffer = FIFOBuffer(rbuffer_size)
         self.sess = tf.Session()
 
-        is_training = tf.placeholder(tf.bool)
+        self.is_training = is_training = tf.placeholder(tf.bool)
 
         # create tf computational graph
         self.theta_L = make_params(dimO[0], dimA[0] * dimA[0], l1size, l2size, 'theta_L')
@@ -55,22 +38,15 @@ class Agent(object):
         self.theta_V = make_params(dimO[0], 1, l1size, l2size, 'theta_V')
         self.theta_Vt, update_Vt = exponential_moving_averages(self.theta_V, tau)
 
-        obs_single = tf.placeholder(tf.float32, [1] + dimO, "obs-single")
-        act_test = ufunction(obs_single, self.theta_U, False, is_training)
-
-        # explore
-        noise_init = tf.zeros([1] + dimA)
-        noise_var = tf.Variable(noise_init, name="noise", trainable=False)
-        self.ou_reset = noise_var.assign(noise_init)
-        noise = noise_var.assign_sub((outheta) * noise_var - tf.random_normal(dimA, stddev=ousigma))
-        act_expl = act_test + noise
+        self.obs_test = tf.placeholder(tf.float32, [1] + dimO, "obs-single")
+        self.act_test = ufunction(self.obs_test, self.theta_U, False, is_training)
 
         # training
-        obs_train = tf.placeholder(tf.float32, [None] + dimO, 'obs_train')
-        act_train = tf.placeholder(tf.float32, [None] + dimA, "act_train")
-        rew = tf.placeholder(tf.float32, [None], "rew")
-        obs2 = tf.placeholder(tf.float32, [None] + dimO, "obs2")
-        term2 = tf.placeholder(tf.bool, [None], "term2")
+        self.obs = obs_train = tf.placeholder(tf.float32, [None] + dimO, 'obs_train')
+        self.act_tensor = act_train = tf.placeholder(tf.float32, [None] + dimA, "act_train")
+        self.rew = rew = tf.placeholder(tf.float32, [None], "rew")
+        self.obs_next = obs2 = tf.placeholder(tf.float32, [None] + dimO, "obs2")
+        self.done = term2 = tf.placeholder(tf.bool, [None], "term2")
         # q
         lmat = lfunction(obs_train, self.theta_L, False, is_training)
         uvalue = ufunction(obs_train, self.theta_U, True, is_training)
@@ -89,110 +65,47 @@ class Agent(object):
         wd_q = tf.add_n([l2reg * tf.nn.l2_loss(var) for var in theta])  # weight decay
         loss_q = ms_td_error + wd_q
         # q optimization
-        optim_q = tf.train.AdamOptimizer(learning_rate=lr, epsilon=1e-4)
-        grads_and_vars_q = optim_q.compute_gradients(loss_q)
-        optimize_q = optim_q.apply_gradients(grads_and_vars_q)
-        with tf.control_dependencies([optimize_q]):
-            train_q = tf.group(update_Vt)
-
-        """
-        summary_writer = tf.train.SummaryWriter(os.path.join(FLAGS.outdir, 'board'), self.sess.graph)
-        summary_list = []
-        summary_list.append(tf.scalar_summary('Qvalue', tf.reduce_mean(q_train)))
-        summary_list.append(tf.scalar_summary('loss', ms_td_error))
-        summary_list.append(tf.scalar_summary('reward', tf.reduce_mean(rew)))
-        """
-
-        # tf functions
-        with self.sess.as_default():
-            self._act_test = Fun([obs_single, is_training], act_test)
-            self._act_expl = Fun([obs_single, is_training], act_expl)
-            self._reset = Fun([], self.ou_reset)
-            self._train = Fun([obs_train, act_train, rew, obs2, term2, is_training], [train_q, loss_q])
-            #, summary_list, summary_writer)
+        self.q_optimize_op = tf.train.AdamOptimizer(learning_rate=lr).minimize(loss_q)
+        self.q_track_op = update_Vt
 
         # initialize tf variables
-        """
-        self.saver = tf.train.Saver(max_to_keep=1)
-        ckpt = tf.train.latest_checkpoint(FLAGS.outdir + "/tf")
-        if ckpt:
-            self.saver.restore(self.sess, ckpt)
-        else:
-        """
         self.sess.run(tf.initialize_all_variables())
-
         self.sess.graph.finalize()
 
-        self.t = 0  # global training time (number of observations)
+    def get_policy(self):
+        return self
 
-    def reset(self, obs):
-        self._reset()
-        self.observation = obs  # initial observation
+    def reset(self):
+        self.exploration.reset()
 
-    def act(self, test=False):
-        obs = np.expand_dims(self.observation, axis=0)
-        action = self._act_test(obs, False) if test else self._act_expl(obs, False)
-        action = np.clip(action, -1, 1)
-        self.action = np.atleast_1d(np.squeeze(action, axis=0))  # TODO: remove this hack
+    def act(self, obs):
+        obs = np.expand_dims(obs, axis=0)
+        act = self.sess.run(self.act_test, feed_dict={self.obs_test: obs, self.is_training: False})
+        action = self.exploration.add_noise(act)
+        self.action = np.atleast_1d(np.squeeze(action, axis=0))
         return self.action
 
-    def observe(self, rew, term, obs2, test=False):
+    def update(self, s, a, r, sn, done):
+        self.buffer.append(SARSData(s,a,r, sn, 0 if done else 1))
+        if len(self.buffer) < self.min_buffer_size:
+            return
 
-        obs1 = self.observation
-        self.observation = obs2
+        for batch in BatchSampler(self.buffer).with_replacement(batch_size=self.batch_size,
+                                                                max_itr=1):
+            obs, act, rew, ob2, not_done = (batch.stack.obs, batch.stack.act, batch.stack.rew,
+                                            batch.stack.obs_next, batch.stack.term_mask)
+            done = (1.0-not_done).astype(np.bool)
 
-        # train
-        if not test:
-            self.t = self.t + 1
-            self.rm.enqueue(obs1, term, self.action, rew)
+            # Optimize policy
+            feed_dict = {self.obs: obs, self.act_tensor: act, self.rew: rew, self.obs_next: ob2, self.done: done,
+                         self.is_training: True}
+            self.sess.run(self.q_optimize_op, feed_dict)
 
-            if self.t > self.min_replay_size:
-                #for i in xrange(self.iter):
-                loss = self.train()
-
-    def train(self):
-        obs, act, rew, ob2, term2, info = self.rm.minibatch(size=self.batch_size)
-        _, loss = self._train(obs, act, rew, ob2, term2, True, global_step=self.t)
-        return loss
+            # Target tracking
+            self.sess.run(self.q_track_op)
 
     def __del__(self):
         self.sess.close()
-
-
-# Tensorflow utils
-#
-class Fun:
-    """ Creates a python function that maps between inputs and outputs in the computational graph. """
-
-    def __init__(self, inputs, outputs, summary_ops=None, summary_writer=None, session=None):
-        self._inputs = inputs if type(inputs) == list else [inputs]
-        self._outputs = outputs
-        self._summary_op = tf.merge_summary(summary_ops) if type(summary_ops) == list else summary_ops
-        self._session = session or tf.get_default_session()
-        self._writer = summary_writer
-
-    def __call__(self, *args, **kwargs):
-        """
-        Arguments:
-          **kwargs: input values
-          log: if True write summary_ops to summary_writer
-          global_step: global_step for summary_writer
-        """
-        log = kwargs.get('log', False)
-
-        feeds = {}
-        for (argpos, arg) in enumerate(args):
-            feeds[self._inputs[argpos]] = arg
-
-        out = self._outputs + [self._summary_op] if log else self._outputs
-        res = self._session.run(out, feeds)
-
-        if log:
-            i = kwargs['global_step']
-            self._writer.add_summary(res[-1], global_step=i)
-            res = res[:-1]
-
-        return res
 
 
 def exponential_moving_averages(theta, tau=0.001):
@@ -271,51 +184,3 @@ def qfunction(obs, avalue, theta, reuse, is_training, scope="qfunction"):
         q = tf.squeeze(q, [1]) + avalue
         return q
 
-
-class ReplayMemory:
-    def __init__(self, size, dimO, dimA, dtype=np.float32):
-        self.size = size
-        so = np.concatenate(np.atleast_1d(size, dimO), axis=0)
-        sa = np.concatenate(np.atleast_1d(size, dimA), axis=0)
-        self.observations = np.empty(so, dtype=dtype)
-        self.actions = np.empty(sa, dtype=np.float32)
-        self.rewards = np.empty(size, dtype=np.float32)
-        self.terminals = np.empty(size, dtype=np.bool)
-        self.info = np.empty(size, dtype=object)
-
-        self.n = 0
-        self.i = 0
-
-    def reset(self):
-        self.n = 0
-        self.i = 0
-
-    def enqueue(self, observation, terminal, action, reward, info=None):
-        self.observations[self.i, ...] = observation
-        self.terminals[self.i] = terminal
-        self.actions[self.i, ...] = action
-        self.rewards[self.i] = reward
-        self.info[self.i, ...] = info
-        self.i = (self.i + 1) % self.size
-        self.n = min(self.size - 1, self.n + 1)
-
-    def minibatch(self, size):
-        indices = np.zeros(size,dtype=np.int)
-        for k in range(size):
-            invalid = True
-            while invalid:
-                # sample index ignore wrapping over buffer
-                i = np.random.randint(0, self.n - 1)
-                # if i-th sample is current one or is terminal: get new index
-                if i != self.i and not self.terminals[i]:
-                    invalid = False
-            indices[k] = i
-
-        o = self.observations[indices, ...]
-        a = self.actions[indices]
-        r = self.rewards[indices]
-        o2 = self.observations[indices + 1, ...]
-        t2 = self.terminals[indices + 1]
-        info = self.info[indices, ...]
-
-        return o, a, r, o2, t2, info
