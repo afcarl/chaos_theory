@@ -61,6 +61,7 @@ def run_online_algorithm(env, algorithm, samples_per_update=5, alg_itrs=10000,
         for _ in progress_itr(range(samples_per_update)):
             pol.reset()
             sample = online_rollout(env, pol, algorithm, max_length=max_length)
+            algorithm.add_traj(sample)
             if logger:
                 logger.log(n, rew=sample.tot_rew, len=sample.T)
             T += sample.T

@@ -8,11 +8,12 @@ import tensorflow as tf
 
 from chaos_theory.algorithm.algorithm import OnlineAlgorithm
 from chaos_theory.data import FIFOBuffer, BatchSampler
-from chaos_theory.models.ddpg_networks import SARSData
+from chaos_theory.models.ddpg_networks import SARSData, SARSTrajData
 from chaos_theory.models.exploration import OUStrategy
 from chaos_theory.models.network_defs import two_layer_policy, two_layer_q
 from chaos_theory.models.policy import Policy
 
+INF = 999
 
 class DDPG(OnlineAlgorithm, Policy):
     def __init__(self, env,
@@ -28,21 +29,24 @@ class DDPG(OnlineAlgorithm, Policy):
                  min_buffer_size=1e3,
                  l2_reg=0,
                  inner_itrs=1,
+                 q_learning_day=0,
                  batch_size=32
                  ):
         super(DDPG, self).__init__()
-        dO = env.observation_space.shape[0]
-        dU = env.action_space.shape[0]
+        self.dO = dO = env.observation_space.shape[0]
+        self.dU = dU = env.action_space.shape[0]
 
         self.min_buffer_size = min_buffer_size
         self.inner_itrs = inner_itrs
         self.batch_size = batch_size
+        self.discount = discount
+        self.q_learning_in_a_day = q_learning_day > 0
         self.buffer = FIFOBuffer(rbuffer_size)
         self.sess = tf.Session()
 
         self.exploration = OUStrategy(env.action_space, theta=noise_theta, sigma=noise_sigma)
         self.obs = tf.placeholder(tf.float32, [None, dO], "obs")
-        self.act_train = tf.placeholder(tf.float32, [None, dU], "act_train")
+        self.act_tensor = tf.placeholder(tf.float32, [None, dU], "act_train")
         self.rew = tf.placeholder(tf.float32, [None], "rew")
         self.obs_next = tf.placeholder(tf.float32, [None, dO], "obs_next")
         self.done = tf.placeholder(tf.bool, [None], "term2")
@@ -62,17 +66,25 @@ class DDPG(OnlineAlgorithm, Policy):
 
         # Q loss
         with tf.variable_scope('critic_q', reuse=True):
-            q_train = q_network(self.obs, self.act_train)
+            q_train = q_network(self.obs, self.act_tensor)
         with tf.variable_scope('target_pol'):
             act2 = pol_network(self.obs_next, dU)
         with tf.variable_scope('target_q'):
             q2 = q_network(self.obs_next, act2)
+        with tf.variable_scope('target_q', reuse=True):
+            self.eval_target_q = q_network(self.obs, self.act_tensor)
         q_target = tf.stop_gradient(tf.select(self.done, self.rew, self.rew + discount * q2))
         td_error = q_train - q_target
         ms_td_error = tf.reduce_mean(tf.square(td_error), reduction_indices=0)
         q_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='critic_q')
         wd_q = tf.add_n([l2_reg * tf.nn.l2_loss(var) for var in q_vars])  # weight decay
         loss_q = ms_td_error + wd_q
+        if self.q_learning_in_a_day:
+            # compute lower bounds
+            self.Lmax = Lmax = tf.placeholder(tf.float32, [None], "lmax")
+            self.Umin = Umin = tf.placeholder(tf.float32, [None], "umin")
+            day_loss = q_learning_day * (tf.square(tf.nn.relu(Lmax - q_train)) + tf.square(tf.nn.relu(q_train-Umin)))
+            loss_q += day_loss
         self.q_optimize_op = tf.train.AdamOptimizer(learning_rate=q_lr).minimize(loss_q, var_list=q_vars)
 
         # Tracking OPs
@@ -82,8 +94,7 @@ class DDPG(OnlineAlgorithm, Policy):
         self.sess.run(tf.initialize_all_variables())
 
     def update(self, s, a, r, sn, done):
-        self.buffer.append(SARSData(s,a,r, sn, 0 if done else 1))
-
+        #self.buffer.append(SARSData(s,a,r, sn, 0 if done else 1))
         if len(self.buffer) < self.min_buffer_size:
             return
 
@@ -95,12 +106,78 @@ class DDPG(OnlineAlgorithm, Policy):
 
             # Optimize policy
             self.sess.run(self.pol_optimize_op, {self.obs: obs})
-            self.sess.run(self.q_optimize_op, {self.obs: obs, self.act_train: act, self.rew: rew,
-                                               self.obs_next: ob2, self.done: done})
+            feed_dict = {self.obs: obs, self.act_tensor: act, self.rew: rew, self.obs_next: ob2, self.done: done}
+            if self.q_learning_in_a_day:
+                upper = self.compute_upper(batch)
+                lower = self.compute_lower(batch)
+                upper, lower = enforce_consistency(upper, lower)
+                np.set_printoptions(suppress=True)
+                print 'upp:', upper
+                print 'low:', lower
+                feed_dict[self.Umin] = upper
+                feed_dict[self.Lmax] = lower
+            self.sess.run(self.q_optimize_op, feed_dict)
 
             # Target tracking
             self.sess.run(self.q_track_op)
             self.sess.run(self.pol_track_op)
+
+    def add_traj(self, traj):
+        for t in range(len(traj)-1):
+            self.buffer.append(SARSTrajData(traj.obs[t], traj.act[t], traj.rew[t],
+                                            traj.obs[t+1], 0 if t==len(traj)-2 else 1, traj, t))
+
+    def compute_upper(self, batch):
+        inv_gamma = 1.0/self.discount
+        bad = np.zeros(len(batch))
+        rew_n = np.zeros((len(batch)))
+        obs_n = np.zeros((len(batch), self.dO))
+        act_n = np.zeros((len(batch), self.dU))
+        for i in range(len(batch)):
+            datapoint = batch[i]
+            obs, act, rew, obs_next = datapoint.obs, datapoint.act, datapoint.rew, datapoint.obs_next
+            traj, t = datapoint.traj, datapoint.t
+
+            if t <= 0:
+                #umin[i] = INF #float('inf')
+                bad[i] = 1
+            else:
+                act_prev = traj.act[t-1]
+                act_prev = np.reshape(act_prev, [1, self.dU])
+                obs_prev = traj.obs[t-1]
+                obs_prev = np.reshape(obs_prev, [1, self.dO])
+                act_n[i] = act_prev
+                obs_n[i] = obs_prev
+                rew_n[i] = rew
+
+        q_target = self.sess.run(self.eval_target_q, {self.obs: obs_n, self.act_tensor: act_n})
+        umin = rew_n + inv_gamma * q_target
+        umin[np.where(bad)] = -INF
+        return umin
+
+    def compute_lower(self, batch):
+        bad = np.zeros(len(batch))
+        rew_n = np.zeros((len(batch)))
+        obs_n = np.zeros((len(batch), self.dO))
+        act_n = np.zeros((len(batch), self.dU))
+        for i in range(len(batch)):
+            datapoint = batch[i]
+            obs, act, rew, obs_next = datapoint.obs, datapoint.act, datapoint.rew, datapoint.obs_next
+            traj, t = datapoint.traj, datapoint.t
+            if t >= len(traj)-2:
+                #lmax[i] = -INF #float('inf')
+                bad[i] = 1
+            else:
+                act_next = traj.act[t+1]
+                act_n[i] = act_next
+                obs_n[i] = obs_next
+                rew_n[i] = rew
+                #act_next = np.reshape(act_next, [1, self.dU])
+                #obs_next = np.reshape(obs_next, [1, self.dO])
+        q_target = self.sess.run(self.eval_target_q, {self.obs: obs_n, self.act_tensor: act_n})
+        lmax = rew_n + self.discount * q_target
+        lmax[np.where(bad)] = INF
+        return lmax
 
     def reset(self):
         self.exploration.reset()
@@ -126,3 +203,8 @@ def make_track_op(scope1, scope2, track_rate):
     return track_ops
 
 
+def enforce_consistency(upper, lower):
+    bad_idx = np.where(lower >= upper)
+    upper[bad_idx] = INF
+    lower[bad_idx] = -INF
+    return upper, lower

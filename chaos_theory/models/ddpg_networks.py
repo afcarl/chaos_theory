@@ -11,6 +11,7 @@ from chaos_theory.utils.tf_utils import assert_shape
 from chaos_theory.data import to_dataset
 
 SARSData = namedtuple('SARSData', ['obs', 'act', 'rew', 'obs_next', 'term_mask'])
+SARSTrajData = namedtuple('SARSData', ['obs', 'act', 'rew', 'obs_next', 'term_mask', 'traj', 't'])
 
 
 def compute_sars(traj):
