@@ -12,6 +12,13 @@ from chaos_theory.utils.config import FLOAT_X
 LOGGER = logging.getLogger(__name__)
 
 
+def make_track_op(scope1, scope2, track_rate):
+    vars1 = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope1)
+    vars2 = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope2)
+    track_ops = [tf.assign(vars1[i], (1-track_rate)*vars1[i] + (track_rate)*vars2[i]) for i in range(len(vars1))]
+    return track_ops
+
+
 def linear(input, dout=None, bias=True, init_scale=1.0, name=''):
     _, din = input.get_shape()
     init = init_scale/np.sqrt(int(din))

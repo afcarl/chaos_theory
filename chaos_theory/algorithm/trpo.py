@@ -16,6 +16,7 @@ import numpy as np
 
 from chaos_theory.algorithm import BatchAlgorithm
 from chaos_theory.models.policy import Policy
+from chaos_theory.utils.colors import ColorLogger
 
 concat = np.concatenate
 from gym.spaces import Box, Discrete
@@ -28,15 +29,23 @@ from chaos_theory.algorithm.trpo_util.filters import ZFilter
 from chaos_theory.algorithm.trpo_util.keras_theano_setup import ConcatFixedStd
 from .trpo_util.trpo_util import *
 
+LOGGER = ColorLogger(__name__)
+
 
 class TRPO(BatchAlgorithm, Policy):
-    def __init__(self, env):
+    def __init__(self, env, timesteps):
         super(TRPO, self).__init__()
+        config = {
+            'timestep_limit': timesteps,
+            'lam': 0.99,
+            'gamma': 0.95,
+            'n_iter': 10000
+        }
         self.agent = TrpoAgent(env.observation_space,
                                env.action_space,
-                               {})
+                               config)
 
-        self.cfg = update_default_config(PG_OPTIONS, {})
+        self.cfg = update_default_config(PG_OPTIONS, config)
 
     def get_policy(self):
         return self
@@ -65,8 +74,14 @@ class TRPO(BatchAlgorithm, Policy):
         compute_advantage(self.agent.baseline, paths, gamma=self.cfg["gamma"], lam=self.cfg["lam"])
         # VF Update ========
         vf_stats = self.agent.baseline.fit(paths)
+        for stat in vf_stats:
+            LOGGER.debug()
         # Pol Update ========
         pol_stats = self.agent.updater(paths)
+        print pol_stats
+
+        print self.agent.get_flat()
+
 
 def compute_advantage(vf, paths, gamma, lam):
     # Compute return, baseline, advantage
@@ -140,7 +155,7 @@ def make_deterministic_mlp(ob_space, ac_space, cfg):
     return policy
 
 FILTER_OPTIONS = [
-    ("filter", int, 1, "Whether to do a running average filter of the incoming observations and rewards")
+    ("filter", int, 0, "Whether to do a running average filter of the incoming observations and rewards")
 ]
 
 def make_filters(cfg, ob_space):
@@ -250,12 +265,12 @@ class TrpoUpdater(EzFlat, EzPickle):
         g = self.compute_policy_gradient(*args)
         losses_before = self.compute_losses(*args)
         if np.allclose(g, 0):
-            print "got zero gradient. not updating"
+            LOGGER.debug("got zero gradient. not updating")
         else:
             stepdir = cg(fisher_vector_product, -g)
             shs = .5 * stepdir.dot(fisher_vector_product(stepdir))
             lm = np.sqrt(shs / cfg["max_kl"])
-            print "lagrange multiplier:", lm, "gnorm:", np.linalg.norm(g)
+            LOGGER.debug("lagrange multiplier: %f gnorm: %f", lm, np.linalg.norm(g))
             fullstep = stepdir / lm
             neggdotstepdir = -g.dot(stepdir)
 
@@ -264,7 +279,7 @@ class TrpoUpdater(EzFlat, EzPickle):
                 return self.compute_losses(*args)[0]  # pylint: disable=W0640
 
             success, theta = linesearch(loss, thprev, fullstep, neggdotstepdir / lm)
-            print "success", success
+            LOGGER.debug("success %s", success)
             self.set_params_flat(theta)
         losses_after = self.compute_losses(*args)
 
@@ -290,21 +305,21 @@ def linesearch(f, x, fullstep, expected_improve_rate, max_backtracks=10, accept_
     Backtracking linesearch, where expected_improve_rate is the slope dy/dx at the initial point
     """
     fval = f(x)
-    print "fval before", fval
+    LOGGER.debug("fval before %f", fval)
     for (_n_backtracks, stepfrac) in enumerate(.5 ** np.arange(max_backtracks)):
         xnew = x + stepfrac * fullstep
         newfval = f(xnew)
         actual_improve = fval - newfval
         expected_improve = expected_improve_rate * stepfrac
         ratio = actual_improve / expected_improve
-        print "a/e/r", actual_improve, expected_improve, ratio
+        LOGGER.debug("a/e/r %f %f %f", actual_improve, expected_improve, ratio)
         if ratio > accept_ratio and actual_improve > 0:
-            print "fval after", newfval
+            LOGGER.debug("fval after %f", newfval)
             return True, xnew
     return False, x
 
 
-def cg(f_Ax, b, cg_iters=10, callback=None, verbose=False, residual_tol=1e-10):
+def cg(f_Ax, b, cg_iters=10, callback=None, verbose=True, residual_tol=1e-10):
     """
     Demmel p 312
     """
@@ -315,12 +330,12 @@ def cg(f_Ax, b, cg_iters=10, callback=None, verbose=False, residual_tol=1e-10):
 
     fmtstr = "%10i %10.3g %10.3g"
     titlestr = "%10s %10s %10s"
-    if verbose: print titlestr % ("iter", "residual norm", "soln norm")
+    if verbose: LOGGER.debug(titlestr, "iter", "residual norm", "soln norm")
 
     for i in xrange(cg_iters):
         if callback is not None:
             callback(x)
-        if verbose: print fmtstr % (i, rdotr, np.linalg.norm(x))
+        if verbose: LOGGER.debug(fmtstr ,i, rdotr, np.linalg.norm(x))
         z = f_Ax(p)
         v = rdotr / p.dot(z)
         x += v * p
@@ -335,5 +350,5 @@ def cg(f_Ax, b, cg_iters=10, callback=None, verbose=False, residual_tol=1e-10):
 
     if callback is not None:
         callback(x)
-    if verbose: print fmtstr % (i + 1, rdotr, np.linalg.norm(x))  # pylint: disable=W0631
+    if verbose: LOGGER.debug(fmtstr ,i + 1, rdotr, np.linalg.norm(x))  # pylint: disable=W0631
     return x

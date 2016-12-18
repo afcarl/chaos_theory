@@ -12,6 +12,7 @@ from chaos_theory.models.ddpg_networks import SARSData
 from chaos_theory.models.exploration import OUStrategy
 from chaos_theory.models.network_defs import two_layer_policy, two_layer_q
 from chaos_theory.models.policy import Policy
+from chaos_theory.utils import make_track_op
 
 
 class DDPG(OnlineAlgorithm, Policy):
@@ -118,11 +119,5 @@ class DDPG(OnlineAlgorithm, Policy):
     def __del__(self):
         self.sess.close()
 
-
-def make_track_op(scope1, scope2, track_rate):
-    vars1 = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope1)
-    vars2 = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope2)
-    track_ops = [tf.assign(vars1[i], (1-track_rate)*vars1[i] + (track_rate)*vars2[i]) for i in range(len(vars1))]
-    return track_ops
 
 

@@ -264,7 +264,8 @@ class NnVf(object):
         self.timestep_limit = timestep_limit
     def predict(self, path):
         ob_no = self.preproc(path["observation"])
-        return self.reg.predict(ob_no)[:,0]
+        value = self.reg.predict(ob_no)[:,0]
+        return value
     def fit(self, paths):
         ob_no = concat([self.preproc(path["observation"]) for path in paths], axis=0)
         vtarg_n1 = concat([path["return"] for path in paths]).reshape(-1,1)

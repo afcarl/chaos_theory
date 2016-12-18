@@ -7,7 +7,7 @@ import numpy as np
 from .keras_theano_setup import FNOPTS, floatX
 
 PG_OPTIONS = [
-    ("timestep_limit", int, 0, "maximum length of trajectories"),
+    ("timestep_limit", int, 100, "maximum length of trajectories"),
     ("n_iter", int, 200, "number of batch"),
     ("parallel", int, 0, "collect trajectories in parallel"),
     ("timesteps_per_batch", int, 10000, ""),

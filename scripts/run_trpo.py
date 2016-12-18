@@ -12,9 +12,11 @@ logging.getLogger().setLevel(logging.DEBUG)
 np.random.seed(0)
 
 if __name__ == "__main__":
-    env = gym.make('InvertedPendulum-v1')
+    #env = gym.make('InvertedPendulum-v1')
+    env = gym.make('CartPole-v1')
+    max_length=100
 
-    algorithm = TRPO(env)
+    algorithm = TRPO(env, max_length)
 
-    run_batch_algorithm(env, algorithm, samples_per_itr=10, alg_itrs=10000, verbose_trial=-1,
-                        max_length=100)
+    run_batch_algorithm(env, algorithm, samples_per_itr=20, alg_itrs=10000, verbose_trial=-1,
+                        max_length=max_length)

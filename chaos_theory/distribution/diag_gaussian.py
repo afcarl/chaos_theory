@@ -44,3 +44,12 @@ class DiagGauss(Distribution):
         ent = np.sum(np.log(2*np.pi*np.e*sigma), axis=-1)
         return 0.5*ent
 
+    def kl_tensor(self, other_dist):
+        other_mu, other_sig = other_dist.params
+        self_mu, self_sig = self.params
+        l1 = tf.reduce_sum(tf.log(other_sig)-tf.log(self_sig), reduction_indices=1)
+        l1 += tf.reduce_sum( self_sig/other_sig, reduction_indices=1)
+        l2 = tf.reduce_sum(tf.square(other_mu - self_mu)/other_sig, reduction_indices=1)
+        return l1+l2 - (self.dU/2)
+
+
