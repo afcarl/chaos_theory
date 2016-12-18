@@ -21,31 +21,30 @@ class Advantage(object):
         pass
 
 
-class LinearBaseline(ValueNetwork, Advantage):
-    def __init__(self, obs_space):
-        super(LinearBaseline, self).__init__(obs_space, linear_value_fn)
+class LinearBaseline(Advantage):
+    def __init__(self, context, obs_space):
+        super(LinearBaseline, self).__init__()
+        self.context = context
+        self.obs_space = obs_space
 
     def eval(self, obs):
         obs = np.expand_dims(obs, axis=0)
-        return self.run(self.value_pred, {self.obs: obs})[0]
+        return self.context.run(self.network.value_pred, {self.network.obs: obs})[0]
 
     def apply(self, ret, act, obs):
-        with tf.variable_scope('value_network', reuse=True):
-            value_pred = self.build_value_network(obs)
-        assert_shape(value_pred, [None, 1])
-        value_pred = value_pred[:,0]
+        self.network = ValueNetwork(self.context, self.obs_space, linear_value_fn,
+                     obs_tensor=obs, labels_tensor=ret)
+        assert_shape(self.network.value_pred, [None, 1])
+        value_pred = self.network.value_pred[:,0]
         adv = ret - value_pred
         return adv
 
     def update(self, samples):
         training_data = ListDataset(samples)
-        self.fit(training_data, max_iter=2000, heartbeat=500)
+        self.network.fit(training_data, max_iter=2000, heartbeat=500)
 
     def train_step(self, batch, lr):
-        return self.run([self.loss, self.train_op], {self.lr:lr,
-                                                     self.obs: batch.concat.obs,
-                                                     self.value_labels: batch.concat.returns})[0]
-
+        self.network.train_step(batch, lr)
 
 class GAE(Advantage):
     def __init__(self, obs_space, _lambda=0.97):

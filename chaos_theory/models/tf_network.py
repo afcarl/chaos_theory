@@ -15,9 +15,8 @@ class TFContext(object):
     def __init__(self, graph=None, sess=None):
         self.__graph = graph if graph else tf.get_default_graph()
         self.__sess = sess if sess else tf.Session(graph=self.__graph)
-        self.__init_network()
 
-    def __init_network(self):
+    def init_network(self):
         with self.__graph.as_default():
             self.saver = tf.train.Saver(tf.trainable_variables())
             self.__sess.run(tf.initialize_all_variables())
@@ -50,18 +49,10 @@ class TFContext(object):
     def __del__(self):
         self.__sess.close()
 
-class TFNet(TFContext):
-    def __init__(self, **build_args):
-        graph = tf.get_default_graph()
-        with graph.as_default():
-            self.build_network(**build_args)
-        sess = tf.Session(graph=graph)
-        super(TFNet, self).__init__(graph, sess)
 
-    @abstractmethod
-    def build_network(self, **kwargs):
-        raise NotImplementedError()
-
+class TFNet(object):
+    def __init__(self):
+        pass
 
     def fit(self, dataset, heartbeat=100, max_iter=float('inf'), batch_size=10, lr=1e-3):
         sampler = BatchSampler(dataset)
@@ -77,4 +68,11 @@ class TFNet(TFContext):
 
     @abstractmethod
     def train_step(self, batch, lr):
+        raise NotImplementedError()
+
+    def __getstate__(self):
+        #TODO: handle fields that are tensors
+        raise NotImplementedError()
+
+    def __setstate__(self, state):
         raise NotImplementedError()
