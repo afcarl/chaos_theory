@@ -6,6 +6,7 @@ Implementations of various RL algorithms using OpenAI Gym environments
 - NAF
 
 TODO:
+- Cross-Entropy Method
 - TRPO/Natural Policy Gradients
 - QProp
 
